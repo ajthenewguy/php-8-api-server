@@ -1,0 +1,12 @@
+{
+    "database": {
+        "driver": "sqlite",
+        "path": "data/test.sqlite"
+    },
+    "logger": {
+        "driver": "standard"
+    },
+    "response-headers": {
+        "Content-Type": "application/vnd.api+json"
+    }
+}
