@@ -3,6 +3,8 @@
 namespace Ajthenewguy\Php8ApiServer\Routing;
 
 use Ajthenewguy\Php8ApiServer\Collection;
+use Ajthenewguy\Php8ApiServer\Exceptions\Http\NotFoundError;
+use Ajthenewguy\Php8ApiServer\Exceptions\Http\MethodNotAllowedError;
 use Ajthenewguy\Php8ApiServer\Str;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
@@ -33,24 +35,41 @@ class Route
 
     public static function lookup(string $method, string $url)
     {
-        $Matches = static::$Table->filter(function (Route $Route) use ($method, $url) {
-            return $Route->matches($method, $url);       
+        $Matches = static::$Table->filter(function (Route $Route) use ($url) {
+            return $Route->matches($url);
+        });
+
+        if ($Matches->empty()) {
+            throw new NotFoundError($url);
+        }
+
+        $Matches = $Matches->filter(function (Route $Route) use ($method) {
+            if ($Route->getMethod() !== 'ANY' && $Route->getMethod() !== strtoupper($method)) {
+                return false;
+            }
+            return true;
+        });
+
+        if ($Matches->empty()) {
+            throw new MethodNotAllowedError($method, $url);
+        }
+
+        $Matches = $Matches->sort(function (Route $RouteA, Route $RouteB) use ($url) {
+            $compareA = Str::before($RouteA->getUri(), '{') ?: $RouteA->getUri();
+            $compareB = Str::before($RouteB->getUri(), '{') ?: $RouteB->getUri();
+            $levA = levenshtein($url, $compareA);
+            $levB = levenshtein($url, $compareB);
+
+            if ($levA === $levB) {
+                return 0;
+            }
+            return $levB > $levA ? -1 : 1;
         });
 
         if (!$Matches->empty()) {
-            $Matches = $Matches->sort(function (Route $RouteA, Route $RouteB) use ($url) {
-                $compareA = Str::before($RouteA->getUri(), '{') ?: $RouteA->getUri();
-                $compareB = Str::before($RouteB->getUri(), '{') ?: $RouteB->getUri();
-                $levA = levenshtein($url, $compareA);
-                $levB = levenshtein($url, $compareB);
-
-                if ($levA === $levB) {
-                    return 0;
-                }
-                return $levB > $levA ? -1 : 1;
-            });
+            
         } else {
-            // throw new NotFoundException($url);
+            // throw new NotFoundError($url);
         }
 
         return $Matches->first();
@@ -147,17 +166,18 @@ class Route
         return $this->paramCount() > 0;
     }
 
-    public function matches(string $method, string $url): bool
+    public function matches(string $url): bool
     {
-        if ($this->getMethod() !== 'ANY' && $this->getMethod() !== strtoupper($method)) {
-            return false;
-        }
-
         if ($this->getUri() === $url && !$this->hasParams()) {
             return true;
         }
 
-        $matches = $this->matchParameters($url);
+        $matches = $this->pregMatch($url);
+
+        if ($matches === false) {
+            return false;
+        }
+
         $Parameters = $this->getParameters();
         $RequiredParameters = $Parameters->filter(function (RouteParameter $Parameter) {
             return $Parameter->isRequired();
@@ -177,12 +197,12 @@ class Route
     }
 
     /**
-     * Given a requested URL match and fill the values.
+     * Given a requested URL match against the config.
      * 
      * @param string $url
      * @return array
      */
-    public function matchParameters(string $url)
+    public function pregMatch(string $url)
     {
         $values = [];
         $routeUri = $this->getUri();
@@ -201,7 +221,7 @@ class Route
             }
             $pattern = str_replace($search, $replace, $pattern);
         });
-        $pattern  .= '#i';
+        $pattern  .= '$#i';
 
         if (preg_match_all($pattern, $url, $matches, PREG_OFFSET_CAPTURE | PREG_PATTERN_ORDER)) {
             $this->getParameters()->each(function (RouteParameter $Parameter) use ($matches, &$values) {
@@ -211,6 +231,8 @@ class Route
                     }
                 }
             });
+        } else {
+            return false;
         }
 
         return $values;

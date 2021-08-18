@@ -326,7 +326,7 @@ final class CollectionTest extends TestCase
     public function testType()
     {
         $C = new Collection([2]);
-        $expected = 'integer';
+        $expected = 'int';
         $actual = $C->type();
 
         $this->assertEquals($expected, $actual);

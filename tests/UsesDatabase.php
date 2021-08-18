@@ -23,7 +23,7 @@ trait UsesDatabase
     protected function setUpDatabase(): \PDO
     {
         if (!isset($this->app)) {
-            $this->app = new Application();
+            $this->app = Application::singleton();
         }
 
         $this->db = new \PDO(sprintf('sqlite:%s', $this->getDatabaseFile()->getPath()), '', '', array(

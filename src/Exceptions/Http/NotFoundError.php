@@ -4,7 +4,7 @@ namespace Ajthenewguy\Php8ApiServer\Exceptions\Http;
 
 use Exception;
 
-class NotFoundException extends Exception
+class NotFoundError extends ServerError
 {
     public function __construct($url, Exception $previous = null)
     {

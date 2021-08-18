@@ -119,7 +119,6 @@ class Memory implements Config
 
         if (false !== strpos($name, '.')) {
             $array = Arr::fromObject($this->data);
-
             if (Arr::set($array, $name, $value, '.')) {
                 $this->data = Arr::toObject($array);
             } else {

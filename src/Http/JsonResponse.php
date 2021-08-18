@@ -17,13 +17,7 @@ class JsonResponse extends Response
         ?string $reason = null
     ): ReactResponse {
 
-        if (is_string($body)) {
-            $body = trim($body);
-
-            if ($body[0] !== '{') {
-                $body = json_encode($body, JSON_THROW_ON_ERROR);
-            }
-        } else {
+        if (!is_string($body)) {
             $body = json_encode($body, JSON_THROW_ON_ERROR);
         }
 

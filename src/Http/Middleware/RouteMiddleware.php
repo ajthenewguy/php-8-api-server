@@ -2,6 +2,7 @@
 
 namespace Ajthenewguy\Php8ApiServer\Http\Middleware;
 
+use Ajthenewguy\Php8ApiServer\Exceptions\Http\ServerError;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
 use Ajthenewguy\Php8ApiServer\Routing\Route;
@@ -28,7 +29,7 @@ class RouteMiddleware
                             return $Parameter->getName();
                         })->toArray();
 
-                        $parameters = $Route->matchParameters($requestTarget);
+                        $parameters = $Route->pregMatch($requestTarget);
 
                         foreach ($parameterKeys as $name) {
                             if (!array_key_exists($name, $parameters)) {
@@ -40,6 +41,8 @@ class RouteMiddleware
                     return $Route->dispatch($request, $parameters);
                 // });
             }
+        } catch (ServerError $e) {
+            return JsonResponse::make($e->getMessage(), $e->getCode());
         } catch (\Throwable $e) {
             Log::error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
         }

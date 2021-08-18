@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace PhpCli\Database;
+namespace Ajthenewguy\Php8ApiServer\Database;
 
 class PaginatedQuery
 {
@@ -24,7 +24,7 @@ class PaginatedQuery
             static::setDriver($db);
         }
 
-        if (is_subclass_of($classNameOrTable, \PhpCli\Models\Model::class)) {
+        if (is_subclass_of($classNameOrTable, \Ajthenewguy\Php8ApiServer\Models\Model::class)) {
             $this->className = $classNameOrTable;
             $this->query();
         } else {

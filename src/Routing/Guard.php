@@ -2,8 +2,7 @@
 
 namespace Ajthenewguy\Php8ApiServer\Routing;
 
-use Ajthenewguy\Php8ApiServer\Auth\Jwt;
-use Psr\Http\Message\ServerRequestInterface;
+use Ajthenewguy\Php8ApiServer\Validation\Validator;
 
 class Guard
 {
@@ -11,21 +10,12 @@ class Guard
         private array $requiredClaims = []
     ) {}
 
-    public function getClaims(ServerRequestInterface $request): ?\stdClass
+    public function validate(?\stdClass $claims)
     {
-        if ($token = $this->extractToken($request)) {
-            return Jwt::decodeToken($token);
-        }
-
-        return null;
-    }
-
-    public function validate(ServerRequestInterface $request)
-    {
-        if ($claims = $this->getClaims($request)) {
+        if ($claims) {
             // validate public claims
             if (isset($claims->exp)) {
-                if (time() + 60 > intval($claims->exp)) {
+                if (time() - 60 > intval($claims->exp)) {
                     // @todo - throw exception with message token is expired?
                     return false;
                 }
@@ -39,24 +29,15 @@ class Guard
             }
 
             // extend this class to validate private claims
+            if (!empty($this->requiredClaims)) {
+                $Validator = new Validator($this->requiredClaims);
+                
+                return $Validator->passes((array) $claims);
+            }
 
             return true;
         }
 
         return false;
-    }
-
-    /**
-     * Get the JWT token from the Authorization header.
-     */
-    protected function extractToken(ServerRequestInterface $request): ?string
-    {
-        $authHeader = $request->getHeader('Authorization');
-
-        if (!empty($authHeader) && preg_match("/Bearer\s+(.*)$/i", $authHeader[0], $matches)) {
-            return $matches[1];
-        }
-
-        return null;
     }
 }

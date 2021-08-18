@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace PhpCli\Facades;
+namespace Ajthenewguy\Php8ApiServer\Facades;
 
 use Ajthenewguy\Php8ApiServer\Database\Drivers\Driver;
 use Ajthenewguy\Php8ApiServer\Database\Query;

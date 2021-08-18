@@ -13,8 +13,6 @@ class Query {
 
     use Where, RequiresServiceContainer;
 
-    private static \PDO $db;
-
     private static QueryException $lastError;
 
     protected string $table;

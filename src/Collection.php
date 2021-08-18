@@ -325,12 +325,9 @@ class Collection implements \IteratorAggregate, \Countable, \JsonSerializable
      */
     protected function getItemType($item): string
     {
-        $type = gettype($item);
+        $type = get_debug_type($item);
         if ($type === 'unknown type') {
             throw new \InvalidArgumentException('Unknown type');
-        }
-        if ($type === 'object') {
-            $type = get_class($item);
         }
         return $type;
     }
@@ -346,6 +343,9 @@ class Collection implements \IteratorAggregate, \Countable, \JsonSerializable
 
     protected function validateType(string $type)
     {
+        if ($type === 'null') {
+            return;
+        }
         if (!isset($this->type) || $this->type === '') {
             $this->setType($type);
         }

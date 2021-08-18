@@ -2,7 +2,8 @@
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use Ajthenewguy\Php8ApiServer\Http\Response;
+use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
+use Ajthenewguy\Php8ApiServer\Routing\Guard;
 use Ajthenewguy\Php8ApiServer\Routing\Route;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -11,5 +12,5 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 
 Route::get('/', function (ServerRequestInterface $request) {
-    return Response::make("Hello there!\n");
+    return JsonResponse::make("Hello there!\n");
 });

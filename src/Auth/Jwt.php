@@ -2,6 +2,7 @@
 
 namespace Ajthenewguy\Php8ApiServer\Auth;
 
+use Ajthenewguy\Php8ApiServer\Application;
 use Firebase\JWT\JWT as FirebaseJWT;
 
 class Jwt
@@ -24,16 +25,16 @@ class Jwt
 
     public static function getPrivateKey(): string
     {
-        return \Ajthenewguy\Php8ApiServer\Application::singleton()->config()->get('security.privateKey');
+        return Application::singleton()->config()->get('security.privateKey');
     }
 
     public static function getPublicKey(): string
     {
-        return \Ajthenewguy\Php8ApiServer\Application::singleton()->config()->get('security.publicKey');
+        return Application::singleton()->config()->get('security.publicKey');
     }
 
     public static function getKeyAlgorithm(): string
     {
-        return \Ajthenewguy\Php8ApiServer\Application::singleton()->config()->get('security.keyAlgorithm');
+        return Application::singleton()->config()->get('security.keyAlgorithm');
     }
 }

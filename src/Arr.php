@@ -113,7 +113,7 @@ class Arr
     {
         $arr = &$array;
         $keys = array_filter(explode($delimiter, $path));
-        $indexedArray = static::isIndexed($array);
+        $indexedArray = (empty($array) ? false : static::isIndexed($array));
 
         foreach ($keys as $key) {
             if ($sanitizeKey) $key = $sanitizeKey($key);
