@@ -16,18 +16,19 @@ class Route
     public function __construct(
         private string $method,
         private string $uri,
-        private $action
+        private $action,
+        private ?Guard $Guard = null
     )
     {}
 
-    public static function delete(string $uri, callable|array $action)
+    public static function delete(string $uri, callable|array $action, ?Guard $Guard = null)
     {
-        static::registerRoute('DELETE', $uri, $action);
+        static::registerRoute('DELETE', $uri, $action, $Guard);
     }
 
-    public static function get(string $uri, callable|array $action)
+    public static function get(string $uri, callable|array $action, ?Guard $Guard = null)
     {
-        static::registerRoute('GET', $uri, $action);
+        static::registerRoute('GET', $uri, $action, $Guard);
     }
 
     public static function lookup(string $method, string $url)
@@ -55,24 +56,19 @@ class Route
         return $Matches->first();
     }
 
-    public static function options(string $uri, callable|array $action)
+    public static function patch(string $uri, callable|array $action, ?Guard $Guard = null)
     {
-        static::registerRoute('OPTIONS', $uri, $action);
+        static::registerRoute('PATCH', $uri, $action, $Guard);
     }
 
-    public static function patch(string $uri, callable|array $action)
+    public static function post(string $uri, callable|array $action, ?Guard $Guard = null)
     {
-        static::registerRoute('PATCH', $uri, $action);
+        static::registerRoute('POST', $uri, $action, $Guard);
     }
 
-    public static function post(string $uri, callable|array $action)
+    public static function put(string $uri, callable|array $action, ?Guard $Guard = null)
     {
-        static::registerRoute('POST', $uri, $action);
-    }
-
-    public static function put(string $uri, callable|array $action)
-    {
-        static::registerRoute('PUT', $uri, $action);
+        static::registerRoute('PUT', $uri, $action, $Guard);
     }
 
     public static function table(): Collection
@@ -108,6 +104,11 @@ class Route
     public function getAction(): array|callable
     {
         return $this->action;
+    }
+
+    public function getGuard(): ?Guard
+    {
+        return $this->Guard;
     }
 
     public function getId(): string
@@ -250,7 +251,7 @@ class Route
         return $Parameters;
     }
 
-    private static function registerRoute(string $method, string $uri, callable|array $action)
+    private static function registerRoute(string $method, string $uri, callable|array $action, ?Guard $Guard = null)
     {
         if (!isset(static::$Table)) {
             static::$Table = new Collection();
@@ -259,6 +260,6 @@ class Route
         $method = strtoupper($method);
         $id = $method . ':' . $uri;
 
-        static::$Table->set($id, new static($method, $uri, $action));
+        static::$Table->set($id, new static($method, $uri, $action, $Guard));
     }
 }

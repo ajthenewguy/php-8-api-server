@@ -10,15 +10,20 @@ use React\Stream\ReadableStreamInterface;
 class JsonResponse extends Response
 {
     public static function make(
-        string|ReadableStreamInterface|StreamInterface $body = '',
+        string|ReadableStreamInterface|StreamInterface|array|\stdClass $body = '',
         int $status = 200,
         string|array $headers = [],
         string $version = '1.1',
         ?string $reason = null
     ): ReactResponse {
-        $body = trim($body);
 
-        if ($body[0] !== '{') {
+        if (is_string($body)) {
+            $body = trim($body);
+
+            if ($body[0] !== '{') {
+                $body = json_encode($body, JSON_THROW_ON_ERROR);
+            }
+        } else {
             $body = json_encode($body, JSON_THROW_ON_ERROR);
         }
 

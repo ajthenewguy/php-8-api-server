@@ -5,7 +5,7 @@ require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/config/routes.php';
 
 use Ajthenewguy\Php8ApiServer\Application;
-use Ajthenewguy\Php8ApiServer\Routing\Router;
+use Ajthenewguy\Php8ApiServer\Http\Middleware;
 
 $Application = Application::singleton(Dotenv\Dotenv::createImmutable(__DIR__));
 
@@ -15,7 +15,11 @@ if (isset($argv[1])) {
     $arguments = array_slice($argv, 2);
     $Application->runCommand($argv[1], ...$arguments);
 } else {
-    $http = new React\Http\HttpServer(new Router());
+    $http = new React\Http\HttpServer(
+        new Middleware\AccessLogging(),
+        new Middleware\AuthorizationMiddleware(),
+        new Middleware\RouteMiddleware()
+    );
     $socket = new React\Socket\SocketServer($_ENV['APP_URL']);
 
     $http->listen($socket);

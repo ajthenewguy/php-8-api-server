@@ -170,8 +170,14 @@ class Application
             $this->setConfig();
         }
 
+        $this->configureSecurityKeys();
         $this->configureDatabase();
         $this->configureLogging();
+
+        ///
+        if (isset($_ENV['APP_TOKEN_LIFETIME_MINS']) && !empty($_ENV['APP_TOKEN_LIFETIME_MINS'])) {
+            $this->config()->set('security.tokenLifetime', $_ENV['APP_TOKEN_LIFETIME_MINS']);
+        }
     }
 
     /**
@@ -179,7 +185,7 @@ class Application
      */
     protected function configureDatabase(): bool
     {
-        $configuration = $this->config()->get('database');
+        $configuration = (array) $this->config()->get('database');
         $env = function ($key, $default = null) {
             $value = $default;
             if (isset($_ENV[$key])) {
@@ -261,5 +267,28 @@ class Application
         });
 
         Log::app($this);
+    }
+
+    protected function configureSecurityKeys()
+    {
+        if (isset($_ENV['APP_PRIVATE_KEY']) && !empty($_ENV['APP_PRIVATE_KEY'])) {
+            $privateKey = $_ENV['APP_PRIVATE_KEY'];
+            if (file_exists($privateKey)) {
+                $privateKey = file_get_contents($privateKey);
+            }
+            $this->config()->set('security.privateKey', $privateKey);
+        }
+
+        if (isset($_ENV['APP_PUBLIC_KEY']) && !empty($_ENV['APP_PUBLIC_KEY'])) {
+            $publicKey = $_ENV['APP_PUBLIC_KEY'];
+            if (file_exists($publicKey)) {
+                $publicKey = file_get_contents($publicKey);
+            }
+            $this->config()->set('security.publicKey', $publicKey);
+        }
+
+        if (isset($_ENV['APP_KEY_ALGORITHM']) && !empty($_ENV['APP_KEY_ALGORITHM'])) {
+            $this->config()->set('security.keyAlgorithm', $_ENV['APP_KEY_ALGORITHM']);
+        }
     }
 }
