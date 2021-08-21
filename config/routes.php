@@ -23,17 +23,15 @@ Route::post('/auth/register', function (Request $request) {
         return JsonResponse::make(['errors' => ['title' => 'Unsupported Media Type']], 415);
     }
 
-    $validated = $request->validate([
+    return $request->validate([
         'email' => ['required', 'email', 'not-exists:users,email'],
         'password' => ['required', 'string'],
         'name_first' => ['required', 'string'],
         'name_last' => ['required', 'string']
     ], [
         'email.not-exists' => 'An account with that email address already exists.'
-    ]);
-
-    return $validated->then(function ($validation) {
-        [$data, $errors] = $validation;
+    ])->then(function ($validated) {
+        [$data, $errors] = $validated;
         if ($errors) {
             return JsonResponse::make(['errors' => $errors], 422);
         }

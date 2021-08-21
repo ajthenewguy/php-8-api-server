@@ -5,6 +5,7 @@ namespace Ajthenewguy\Php8ApiServer\Http;
 use Ajthenewguy\Php8ApiServer\Traits\MagicProxy;
 use Ajthenewguy\Php8ApiServer\Validation\Validator;
 use Psr\Http\Message\ServerRequestInterface;
+use React\Promise\PromiseInterface;
 
 class Request
 {
@@ -80,7 +81,7 @@ class Request
         return $this->POST;
     }
 
-    public function validate(array $rules, array $messages = [])
+    public function validate(array $rules, array $messages = []): PromiseInterface
     {
         $POST = $this->post();
 

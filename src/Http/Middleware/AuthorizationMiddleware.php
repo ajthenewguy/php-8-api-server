@@ -4,61 +4,41 @@ declare(strict_types=1);
 
 namespace Ajthenewguy\Php8ApiServer\Http\Middleware;
 
-use Ajthenewguy\Php8ApiServer\Auth\Jwt;
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\ServerError;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
+use Ajthenewguy\Php8ApiServer\Repositories\UserRepository;
 use Ajthenewguy\Php8ApiServer\Routing\Route;
+use Ajthenewguy\Php8ApiServer\Services\AuthService;
+use Firebase\JWT\ExpiredException;
 use Firebase\JWT\SignatureInvalidException;
 use Psr\Http\Message\ServerRequestInterface;
 
-class AuthorizationMiddleware
+class AuthorizationMiddleware extends Middleware
 {
     public function __invoke(ServerRequestInterface $request, callable $next)
     {
+        // print "\n". __CLASS__ . "\n";
+        // Log::debug($request); // React\Http\Message\ServerRequest
         try {
-            $requestMethod = $request->getMethod();
-            $requestTarget = $request->getRequestTarget();
-
-            if ($Route = Route::lookup($requestMethod, $requestTarget)) {
-                // Check for a Route Guard
-                if ($Guard = $Route->getGuard()) {
-                    if (!$Guard->validate($this->getClaims($request))) {
-                        return JsonResponse::make('Unauthorized', 401);
-                    }
+            $claims = AuthService::getClaims($request);
+            $Repo = new UserRepository();
+            if ($User = $Repo->getById($claims->user_id)) {
+                if ($User->email === 'allenmccabe@gmail.com') {
+                    return $next($request);
                 }
             }
+
+            return JsonResponse::make('Forbidden', 403);
+            
         } catch (ServerError $e) {
-            return JsonResponse::make($e->getMessage(), $e->getCode());
+            return JsonResponse::make($e->getMessage() . ' Authorization!', $e->getCode());
         } catch (SignatureInvalidException $e) {
             return JsonResponse::make($e->getMessage(), 403);
-        } catch (\Throwable $e) {
-            Log::error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
+        } catch (ExpiredException $e) {
+            return JsonResponse::make($e->getMessage(), 401);
         }
 
         return $next($request);
-    }
-
-    public function getClaims(ServerRequestInterface $request): ?\stdClass
-    {
-        if ($token = $this->extractToken($request)) {
-            return Jwt::decodeToken($token);
-        }
-
-        return null;
-    }
-
-    /**
-     * Get the JWT token from the Authorization header.
-     */
-    protected function extractToken(ServerRequestInterface $request): ?string
-    {
-        $authHeader = $request->getHeader('Authorization');
-
-        if (!empty($authHeader) && preg_match("/Bearer\s+(.*)$/i", $authHeader[0], $matches)) {
-            return $matches[1];
-        }
-
-        return null;
     }
 }

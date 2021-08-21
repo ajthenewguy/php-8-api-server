@@ -17,7 +17,6 @@ class RouteMiddleware extends Middleware
 {
     public function __invoke(ServerRequestInterface $request)
     {
-        print "\n" . __CLASS__ . "\n";
         try {
             $requestMethod = $request->getMethod();
             $requestTarget = $request->getRequestTarget();
@@ -47,6 +46,6 @@ class RouteMiddleware extends Middleware
             return JsonResponse::make($e->getMessage() . ' - RouteMiddleware', $e->getCode());
         }
 
-        return JsonResponse::make('Not found', 404);
+        return JsonResponse::make('Internal Server Error', 500);
     }
 }

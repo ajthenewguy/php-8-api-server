@@ -17,8 +17,6 @@ class AuthenticationMiddleware extends Middleware
 {
     public function __invoke(ServerRequestInterface $request, callable $next)
     {
-        print "\n" . __CLASS__ . "\n";
-        // Log::debug($request); // React\Http\Message\ServerRequest
         try {
             $requestMethod = $request->getMethod();
             $requestTarget = $request->getRequestTarget();

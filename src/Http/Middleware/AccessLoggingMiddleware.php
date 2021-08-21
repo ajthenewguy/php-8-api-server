@@ -12,8 +12,6 @@ class AccessLoggingMiddleware extends Middleware
 {
     public function __invoke(ServerRequestInterface $request, callable $next)
     {
-        print "\n" . __CLASS__ . "\n";
-        
         $promise = Promise\resolve($next($request));
         return $promise->then(function (ResponseInterface $response) use ($request) {
             $serverParams = $request->getServerParams();
