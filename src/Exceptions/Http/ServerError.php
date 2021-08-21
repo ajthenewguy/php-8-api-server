@@ -6,7 +6,7 @@ use Exception;
 
 class ServerError extends Exception
 {
-    public function __construct($message = 'Server Error', int $code = 500, Exception $previous = null)
+    public function __construct($message = 'Internal Server Error', int $code = 500, Exception $previous = null)
     {
         parent::__construct($message, $code, $previous);
     }

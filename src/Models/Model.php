@@ -3,6 +3,8 @@
 namespace Ajthenewguy\Php8ApiServer\Models;
 
 use Ajthenewguy\Php8ApiServer\Database\Query;
+use Ajthenewguy\Php8ApiServer\Exceptions\ModelException;
+use React\Promise;
 
 class Model implements \JsonSerializable, \Serializable
 {
@@ -54,68 +56,95 @@ class Model implements \JsonSerializable, \Serializable
         $this->setAttributes($attributes);
     }
 
-    public static function create(array $attributes = []): Model
+    public static function create(array $attributes = [])
     {
         if (isset($attributes[0]) && is_array($attributes[0])) {
             throw new \InvalidArgumentException(sprintf(
                 'Models must be created on at a time. Use %s::insert() for inserting multiple records.', get_called_class()
             ));
         }
+
         $instance = static::newInstance();
-        $instance->insertInternal($attributes);
 
-        return $instance;
+        return $instance->insertInternal($attributes)->then(function ($id) {
+            return self::find($id);
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            $this->db->quit();
+        });
     }
 
-    public static function find($id)
+    public static function find($id): Promise\PromiseInterface
     {
-        static::getConnection();
-
         return static::where(static::getPrimaryKey(), $id)->first();
-    }
-
-    public static function getConnection(\PDO $db = null)
-    {
-        if (is_null($db)) {
-            $db = Query::driver();
-        }
-
-        if (!($db instanceof \PDO)) {
-            throw new \RuntimeException('No PDO instance available.');
-        }
-
-        return $db;
     }
 
     public static function newInstance($attributes = []): Model
     {
-        return new static($attributes, static::getConnection());
+        return new static($attributes);
     }
 
     public static function newQuery(): Query
     {
-        Query::setDriver(static::getConnection());
         return Query::table(static::getTable());
     }
 
-    public function first()
+
+
+    /**
+     * Delete the record.
+     * 
+     * @return Promise\PromiseInterface
+     */
+    public function delete(): Promise\PromiseInterface
     {
-        $instance = null;
-        if ($result = $this->getQuery()->first()) {
-            $instance = static::newInstance($result);
-            $instance->exists = true;
-        }
-        return $instance;
+        return Query::table(static::getTable())
+            ->where(static::$primaryKey, $this->primaryKey())
+            ->delete()
+            ->then(function ($affected) {
+                $this->exists = false;
+                $this->attributes = [];
+                return $affected === 1;
+            });
     }
 
-    public function get()
+    /**
+     * Check if the primary key is set (implying the record is persisted).
+     * 
+     * @return bool
+     */
+    public function exists(): bool
     {
-        $results = $this->getQuery()->get();
+        if (isset($this->exists)) {
+            return $this->exists;
+        }
 
-        return $results->map(function ($attributes) {
-            $instance = static::newInstance($attributes);
-            $instance->exists = true;
-            return $instance;
+        if (empty($this->attributes)) return false;
+
+        return isset($this->attributes[static::$primaryKey]);
+    }
+
+    public function first(): Promise\PromiseInterface
+    {
+        return $this->getQuery()->first()->then(function ($row) {
+            if ($row) {
+                return static::newInstance($row);
+            }
+            return null;
+        });
+    }
+
+    public function get(): Promise\PromiseInterface
+    {
+        return $this->getQuery()->get()->then(function ($Models) {
+            if ($Models) {
+                return $Models->map(function ($attributes) {
+                    $instance = static::newInstance($attributes);
+                    $instance->exists = true;
+                    return $instance;
+                });
+            }
+            return $Models;
         });
     }
 
@@ -270,14 +299,14 @@ class Model implements \JsonSerializable, \Serializable
             case 'date':
                 $value = $this->asDate($value);
                 if ($format) {
-                    $value = $format->format($value);
+                    $value = $value->format($value);
                 }
                 return $value;
             break;
             case 'datetime':
                 $value = $this->asDatetime($value);
                 if ($format) {
-                    $value = $format->format($value);
+                    $value = $value->format($value);
                 }
                 return $value;
             break;
@@ -288,39 +317,6 @@ class Model implements \JsonSerializable, \Serializable
         }
 
         return $value;
-    }
-
-    /**
-     * Delete the record.
-     * 
-     * @return bool
-     */
-    public function delete(): bool
-    {
-        static::getConnection();
-
-        $query = Query::table(static::getTable())
-            ->where(static::$primaryKey, $this->primaryKey());
-
-        $this->exists = !$query->delete();
-
-        return !$this->exists;
-    }
-
-    /**
-     * Check if the primary key is set (implying the record is persisted).
-     * 
-     * @return bool
-     */
-    public function exists(): bool
-    {
-        if (isset($this->exists)) {
-            return $this->exists;
-        }
-
-        if (empty($this->attributes)) return false;
-
-        return isset($this->attributes[static::$primaryKey]);
     }
 
     public function hasAttribute(string $name): bool
@@ -342,9 +338,9 @@ class Model implements \JsonSerializable, \Serializable
      * Insert a new record.
      * 
      * @param array $attributes
-     * @return mixed
+     * @return Promise\PromiseInterface
      */
-    protected function insertInternal(array $attributes = []): bool
+    protected function insertInternal(array $attributes = []): Promise\PromiseInterface
     {
         if (isset($attributes[0]) && is_array($attributes[0])) {
             throw new \InvalidArgumentException(__METHOD__.' must be used to insert one record at a time.');
@@ -357,18 +353,16 @@ class Model implements \JsonSerializable, \Serializable
             throw new \InvalidArgumentException('Data includes primary key value.');
         }
 
-        if ($id = static::newQuery()->insert($this->uncastAttributes($attributes), static::CREATED_FIELD)) {
-            if (static::$primaryKeyType === 'int') {
-                $id = intval($id);
+        return static::newQuery()->insert($this->uncastAttributes($attributes), static::CREATED_FIELD)->then(function ($primaryKey) {
+            if ($primaryKey !== null) {
+                if (static::$primaryKeyType === 'int') {
+                    return intval($primaryKey);
+                }
+                return $primaryKey;
             }
-            $this->attributes[static::$primaryKey] = $id;
-            $this->exists = true;
-            $this->refresh();
-
-            return true;
-        }
-
-        return false;
+            
+            return null;
+        });
     }
 
     /**
@@ -377,7 +371,7 @@ class Model implements \JsonSerializable, \Serializable
      * @param array $records
      * @return int
      */
-    protected function multiInsert(array $records): int
+    protected function multiInsert(array $records): Promise\PromiseInterface
     {
         return static::newQuery()->insert($this->uncastAttributes($records), static::CREATED_FIELD);
     }
@@ -416,34 +410,49 @@ class Model implements \JsonSerializable, \Serializable
         return $instance;
     }
 
-    public function refresh()
+    /**
+     * Refresh the instance attributes.
+     *
+     * @return Promise\PromiseInterface
+     */
+    public function refresh(): Promise\PromiseInterface
     {
-        static::getConnection();
-
         if (!$this->exists()) {
-            throw new \LogicException('Cannot refresh nonexistent model.');
+            throw new \LogicException('Cannot refresh non-existent model.');
         }
 
-        $attributes = Query::table(static::getTable())
+        return Query::table(static::getTable())
             ->where(static::$primaryKey, $this->primaryKey())
-            ->first();
+            ->first()->then(function ($attributes) {
+                if ($attributes === null) {
+                    throw new ModelException('Error refreshing model attributes.');
+                }
 
-        $this->setAttributes(get_object_vars($attributes));
+                $this->setAttributes((array) $attributes);
 
-        return $this;
+                return $this;
+            });
     }
 
     /**
      * Create or update the instance.
      *
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function save(): bool
+    public function save(): Promise\PromiseInterface
     {
         if ($this->exists()) {
             return $this->update();
         } else {
-            return $this->insertInternal();
+            return $this->insertInternal()->then(function ($id) {
+                if ($id === null) {
+                    throw new ModelException('Error creating model.');
+                }
+                $this->attributes[static::$primaryKey] = $id;
+                $this->exists = true;
+
+                return $this->refresh();
+            });
         }
     }
 
@@ -483,12 +492,10 @@ class Model implements \JsonSerializable, \Serializable
 
     /**
      * @param array $attributes
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function update(array $attributes = []): bool
+    public function update(array $attributes = []): Promise\PromiseInterface
     {
-        static::getConnection();
-
         if (!empty($attributes)) {
             foreach ($attributes as $key => $val) {
                 if ($this->attributes[$key] !== $val) {
@@ -498,7 +505,7 @@ class Model implements \JsonSerializable, \Serializable
         }
 
         if (!$this->isDirty()) {
-            return true;
+            return Promise\resolve($this);
         }
 
         $attributes = $this->dirty;
@@ -507,14 +514,15 @@ class Model implements \JsonSerializable, \Serializable
         }
         unset($attributes[static::$primaryKey]);
 
-        $query = static::newQuery()->where(static::$primaryKey, $this->primaryKey());
-        if ($query->update($this->uncastAttributes($attributes), static::UPDATED_FIELD)) {
-            $this->refresh();
-
-            return true;
-        }
-
-        return false;
+        return static::newQuery()
+            ->where(static::$primaryKey, $this->primaryKey())
+            ->update($this->uncastAttributes($attributes), static::UPDATED_FIELD)
+            ->then(function ($changed) {
+                if ($changed !== 1) {
+                    throw new ModelException('Error updating model.');
+                }
+                return $this->refresh();
+            });
     }
 
     /**

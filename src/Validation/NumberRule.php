@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class NumberRule extends RegexRule
 {
     protected string $name = 'number';
@@ -17,10 +19,10 @@ class NumberRule extends RegexRule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
-        return is_numeric($input);
+        return $this->resolve($name, $input, is_numeric($input));
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class StringRule extends RegexRule
 {
     protected string $name = 'string';
@@ -17,10 +19,10 @@ class StringRule extends RegexRule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
-        return is_string($input);
+        return $this->resolve($name, $input, is_string($input));
     }
 }

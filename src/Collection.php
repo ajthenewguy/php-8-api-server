@@ -11,8 +11,9 @@ class Collection implements \IteratorAggregate, \Countable, \JsonSerializable
 
     private string $type;
 
-    public function __construct($set = null)
+    public function __construct($set = null, string $type = null)
     {
+        $this->setType($type);
         $this->setInternal($set);
     }
 
@@ -145,6 +146,14 @@ class Collection implements \IteratorAggregate, \Countable, \JsonSerializable
     public function isNumeric(): bool
     {
         return Arr::isIndexed($this->set);
+    }
+
+    /**
+     * Get the keys of the internal set.
+     */
+    public function keys(): array
+    {
+        return array_keys($this->set);
     }
 
     public function last(callable $filter = null)
@@ -332,9 +341,9 @@ class Collection implements \IteratorAggregate, \Countable, \JsonSerializable
         return $type;
     }
 
-    protected function setType(string $type)
+    protected function setType(?string $type)
     {
-        if ($type !== 'NULL' && (!isset($this->type) || $this->type === '')) {
+        if ($type !== null && $type !== 'NULL' && (!isset($this->type) || $this->type === '')) {
             $this->type = $type;
         }
 
@@ -351,7 +360,7 @@ class Collection implements \IteratorAggregate, \Countable, \JsonSerializable
         }
 
         $thisType = $this->type();
-        if ($thisType && $thisType !== $type) {
+        if ($thisType && ($thisType !== $type && !is_subclass_of($type, $thisType, true))) {
             throw new InvalidTypeException($thisType, $type);
         }
     }

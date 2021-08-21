@@ -8,10 +8,12 @@ use Ajthenewguy\Php8ApiServer\Database\Query;
 use Ajthenewguy\Php8ApiServer\Exceptions\FileNotFoundException;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Filesystem\File;
+use Ajthenewguy\Php8ApiServer\Http\Middleware\Middleware;
 use Ajthenewguy\Php8ApiServer\Reporting\Logger;
 use Ajthenewguy\Php8ApiServer\Traits\HasConfig;
 use Ajthenewguy\Php8ApiServer\Traits\RequiresBinary;
 use Ajthenewguy\Php8ApiServer\Traits\SystemInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 class Application
 {
@@ -23,9 +25,9 @@ class Application
 
     protected array $instances;
 
-    protected array $providers;
+    protected Collection $Middlewares;
 
-    protected static \PDO $db;
+    protected array $providers;
 
     protected function __construct(\Dotenv\Dotenv $dotenv = null)
     {
@@ -68,9 +70,9 @@ class Application
         $this->instances[$class] = $instance;
     }
 
-    public function db(): ?\PDO
+    public function db()
     {
-        return static::$db ?? null;
+        return $this->instance(DatabaseDriver::class) ?? null;
     }
 
     /**
@@ -85,6 +87,30 @@ class Application
         }
 
         $this->providers[$class] = $provider;
+    }
+
+    /**
+     * Return the middleware stack.
+     */
+    public function handleRequest(): array
+    {
+        $Middleware = new Collection(null, Middleware::class);
+        
+        $this->Middlewares->each(function ($middleware) use ($Middleware) {
+            $Middleware->push(new $middleware());
+        });
+        
+        return $Middleware->toArray();
+    }
+
+    public function handleNext(ServerRequestInterface $request, callable $next, string $name)
+    {
+        if ($middleware = $this->Middlewares->get($name)) {
+            $Middleware = new $middleware();
+            return $Middleware($request, $next);
+        }
+
+        return $next($request);
     }
 
     /**
@@ -132,6 +158,18 @@ class Application
     }
 
     /**
+     * Register a middleware.
+     */
+    public function registerMiddleware(string $name, string $middleware): void
+    {
+        if (!isset($this->Middlewares)) {
+            $this->Middlewares = new Collection();
+        }
+
+        $this->Middlewares->set($name, $middleware);
+    }
+
+    /**
      * Run a command.
      */
     public function runCommand(string $name, array $arguments = [])
@@ -174,9 +212,11 @@ class Application
         $this->configureDatabase();
         $this->configureLogging();
 
-        ///
+        // Set the token lifetime
         if (isset($_ENV['APP_TOKEN_LIFETIME_MINS']) && !empty($_ENV['APP_TOKEN_LIFETIME_MINS'])) {
             $this->config()->set('security.tokenLifetime', $_ENV['APP_TOKEN_LIFETIME_MINS']);
+        } else {
+            $this->config()->set('security.tokenLifetime', 15);
         }
     }
 
@@ -234,20 +274,18 @@ class Application
             $configuration = array_filter($configuration);
 
             if (!empty($configuration)) {
-                static::$db = DatabaseDriver::create($configuration);
-                $this->bindInstance(DatabaseDriver::class, static::$db);
+                $this->bindInstance(DatabaseDriver::class, DatabaseDriver::create($configuration));
                 Query::app($this);
 
                 try {
-                    static::$db->exec('SELECT 1 FROM migrations');
+                    $this->db()->exec('SELECT 1 FROM migrations');
                 } catch (\Throwable $e) {
-                    static::$db->exec('CREATE TABLE IF NOT EXISTS migrations (
+                    $this->db()->exec('CREATE TABLE IF NOT EXISTS migrations (
                         id INTEGER PRIMARY KEY,
                         migration VARCHAR (128) NOT NULL,
                         batch INTEGER NOT NULL DEFAULT 1
                     )');
                 }
-                
 
                 return true;
             }
@@ -289,6 +327,13 @@ class Application
 
         if (isset($_ENV['APP_KEY_ALGORITHM']) && !empty($_ENV['APP_KEY_ALGORITHM'])) {
             $this->config()->set('security.keyAlgorithm', $_ENV['APP_KEY_ALGORITHM']);
+        }
+    }
+
+    public function close()
+    {
+        if ($this->db()) {
+            $this->db()->quit();
         }
     }
 }

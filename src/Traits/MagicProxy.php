@@ -4,14 +4,23 @@ namespace Ajthenewguy\Php8ApiServer\Traits;
 
 trait MagicProxy
 {
+    protected $proxied;
+
+    protected static $proxiedClass;
+
+    public function _proxied()
+    {
+        return $this->proxied;
+    }
+
     public function __call($name, $args)
     {
-        return call_user_func_array([$this, $name], $args);
+        return call_user_func_array([$this->proxied, $name], $args);
     }
 
     public static function __callStatic($name, $args)
     {
-        return call_user_func_array([static::class, $name], $args);
+        return call_user_func_array([static::$proxiedClass, $name], $args);
     }
 
     public function __get($name)

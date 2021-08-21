@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class RequiredRule extends Rule
 {
     protected string $name = 'required';
@@ -17,13 +19,13 @@ class RequiredRule extends Rule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
         if (is_string($input)) {
-            return strlen($input) > 0;
+            return $this->resolve($name, $input, strlen($input) > 0);
         }
-        return !empty($input);
+        return $this->resolve($name, $input, !empty($input));
     }
 }

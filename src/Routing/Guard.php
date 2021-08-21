@@ -3,6 +3,8 @@
 namespace Ajthenewguy\Php8ApiServer\Routing;
 
 use Ajthenewguy\Php8ApiServer\Validation\Validator;
+use React\Promise;
+use React\Promise\PromiseInterface;
 
 class Guard
 {
@@ -10,21 +12,21 @@ class Guard
         private array $requiredClaims = []
     ) {}
 
-    public function validate(?\stdClass $claims)
+    public function validate(?\stdClass $claims): PromiseInterface
     {
         if ($claims) {
             // validate public claims
             if (isset($claims->exp)) {
                 if (time() - 60 > intval($claims->exp)) {
                     // @todo - throw exception with message token is expired?
-                    return false;
+                    return Promise\resolve(false);
                 }
             }
 
             if (isset($claims->nbf)) {
                 if (time() - 60 < intval($claims->nbf)) {
                     // @todo - throw exception with message token is not yet valid?
-                    return false;
+                    return Promise\resolve(false);
                 }
             }
 
@@ -32,12 +34,12 @@ class Guard
             if (!empty($this->requiredClaims)) {
                 $Validator = new Validator($this->requiredClaims);
                 
-                return $Validator->passes((array) $claims);
+                return $Validator->validate((array) $claims);
             }
 
-            return true;
+            return Promise\resolve(true);
         }
 
-        return false;
+        return Promise\resolve(false);
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class ArrayRule extends RegexRule
 {
     protected string $name = 'array';
@@ -19,20 +21,20 @@ class ArrayRule extends RegexRule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
         if (is_string($input) && strlen($input) > 1) {
             foreach ($this->delimiters as $delim) {
                 if (false !== strpos($input, $delim)) {
-                    return true;
+                    return $this->resolve($name, $input, true);
                 }
             }
 
-            return $input[0] === '[' && $input[-1] === ']';
+            return $this->resolve($name, $input, $input[0] === '[' && $input[-1] === ']');
         }
 
-        return is_array($input);
+        return $this->resolve($name, $input, is_array($input));
     }
 }

@@ -20,20 +20,17 @@ trait UsesDatabase
         return new File(sprintf('%s/database.sqlite3', __DIR__));
     }
 
-    protected function setUpDatabase(): \PDO
+    protected function setUpDatabase(): Driver
     {
         if (!isset($this->app)) {
             $this->app = Application::singleton();
         }
 
-        $this->db = new \PDO(sprintf('sqlite:%s', $this->getDatabaseFile()->getPath()), '', '', array(
-            \PDO::ATTR_EMULATE_PREPARES => false,
-            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
-        ));
+        $this->tearDownDatabase();
 
-        $this->app->bindInstance(Driver::class, $this->db);
-        Query::app($this->app);
+        $this->app->bindInstance(Driver::class, Driver::create(['driver' => 'sqlite', 'path' => $this->getDatabaseFile()->getPath()]));
+        // Query::app($this->app);
+        $this->db = $this->app->instance(Driver::class);
 
         return $this->db;
     }

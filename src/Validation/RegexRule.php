@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class RegexRule extends Rule
 {
     protected string $name = 'regex';
@@ -35,20 +37,21 @@ class RegexRule extends Rule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
         if (strlen($input) < 1) {
-            return true;
+            return $this->resolve($name, $input, true);
         }
         if ($this->regex) {
             $result = preg_match($this->regex, $input);
             if ($result === false) {
-                throw new \Exception('RegexRule regular expression error: '.preg_last_error_msg());
+                throw new \Exception('RegexRule regular expression error: ' . preg_last_error_msg());
             }
-            return (bool) $result;
+            return $this->resolve($name, $input, (bool) $result);
         }
-        return false;
+
+        return $this->resolve($name, $input, false);
     }
 }

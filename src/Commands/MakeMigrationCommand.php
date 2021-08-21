@@ -34,7 +34,7 @@ final class MakeMigrationCommand extends Command
             $filename = preg_replace('/\s+/', '_', trim($line));
 
             $filename = 'Migration_' . date('Y_m_d_') . $filename . '.php';
-            $destination = dirname(__DIR__) . '/migrations/';
+            $destination = dirname(dirname(__DIR__)) . '/migrations/';
             $stdio->write('Wrting: ' . $filename . ' to ' . $destination . PHP_EOL);
 
             $Migration = new File($destination . $filename);

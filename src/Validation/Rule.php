@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class Rule
 {
     protected string $message;
@@ -52,15 +54,20 @@ class Rule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
         if (isset($this->test)) {
             $test = $this->test;
-            return (bool) $test($input);
+            $this->resolve($name, $input, (bool) $test($input));
         }
-        return false;
+        return $this->resolve($name, $input, false);
+    }
+
+    protected function resolve(string $name, $input, bool $result): Promise\PromiseInterface
+    {
+        return Promise\resolve(['Rule' => $this, 'field' => $name, 'input' => $input, 'result' => $result]);
     }
 
     public function __get($name): ?string

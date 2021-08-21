@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use Ajthenewguy\Php8ApiServer\Database\Query;
 use Ajthenewguy\Php8ApiServer\Database\PaginatedQuery;
 use Ajthenewguy\Php8ApiServer\Models\Model;
+use React\EventLoop\Loop;
 use Tests\TestCase;
 
 final class ModelTest extends TestCase
@@ -17,13 +18,27 @@ final class ModelTest extends TestCase
 
         $this->db->exec('CREATE TABLE IF NOT EXISTS model (
             id INTEGER PRIMARY KEY,
-            name VARCHAR (30) NOT NULL
+            name VARCHAR (30) NOT NULL,
+            created_at TIMESTAMP DEFAULT (strftime(\'%s\',\'now\')),
+            updated_at TIMESTAMP
         )');
 
-        $result = Query::table('model')->insert(['name' => 'ModelFind']);
-        $Model = Model::find(intval($result));
+        $loop = Loop::get();
 
-        $this->assertEquals('ModelFind', $Model->name);
+        Query::table('model')->insert(['name' => 'ModelFind'])->then(function ($id) {
+            Model::find($id)->then(function ($Model) {
+                $this->assertEquals('ModelFind', $Model->name);
+            })->done();
+        })->done();
+
+        Model::insert(['name' => 'ModelFind'])->then(function ($id) {
+            Model::find($id)->then(function ($Model) {
+                $this->assertEquals('ModelFind', $Model->name);
+                $this->db->quit();
+            })->done();
+        })->done();
+
+        $loop->run();
     }
 
     public function testWhere()
@@ -37,19 +52,27 @@ final class ModelTest extends TestCase
             size VARCHAR (10) DEFAULT NULL
         )');
 
-        $result = Query::table('model')->insert(['name' => 'ModelFind']);
-        $Model = Model::where('name', 'ModelFind')->first();
+        $loop = Loop::get();
 
-        $this->assertEquals((int) $result, $Model->id);
+        Query::table('model')->insert(['name' => 'ModelFind'])->then(function ($id) {
+            Model::where('name', 'ModelFind')->first()->then(function ($Model) use ($id) {
+                $this->assertEquals($id, $Model->id);
+            })->done();
+        })->done();
 
         Query::table('model')->insert([
             ['name' => 'First', 'color' => 'red', 'size' => 'small'],
             ['name' => 'Second', 'color' => 'blue', 'size' => 'medium'],
             ['name' => 'Third', 'color' => 'blue', 'size' => 'large']
-        ]);
-        $Model = Model::where('color', 'blue')->where('size', 'medium')->first();
+        ])->then(function ($count) {
+            $this->assertEquals(3, $count);
+            Model::where('color', 'blue')->where('size', 'medium')->first()->then(function ($Model) {
+                $this->assertEquals('Second', $Model->name);
+                $this->db->close();
+            })->done();
+        })->done();
 
-        $this->assertEquals('Second', $Model->name);
+        $loop->run();
     }
 
     public function testGetAttribute()
@@ -89,10 +112,26 @@ final class ModelTest extends TestCase
             'name' => 'ModelDelete'
         ]);
 
-        $result = Query::table('model')->insert(['name' => 'ModelDelete']);
-        $Model->setAttribute('id', (int) $result);
+        $loop = Loop::get();
 
-        $this->assertTrue($Model->delete());
+        Query::table('model')->insert(['name' => 'ModelDelete'])->then(function ($id) use ($Model) {
+            $Model->setAttribute('id', (int) $id);
+
+            Model::find($id)->then(function ($Model) use ($id) {
+                $this->assertEquals($id, $Model->id);
+                
+                $Model->delete()->then(function ($result) use ($id) {
+                    $this->assertTrue($result);
+
+                    Model::find($id)->then(function ($Model) {
+                        $this->assertNull($Model);
+                        $this->db->quit();
+                    })->done();
+                })->done();
+            })->done();
+        })->done();
+
+        $loop->run();
     }
 
     public function testExists()
@@ -104,14 +143,20 @@ final class ModelTest extends TestCase
             name VARCHAR (30) NOT NULL
         )');
 
+        $loop = Loop::get();
+
         $Model = new Model();
 
         $this->assertFalse($Model->exists());
 
-        $result = Query::table('model')->insert(['name' => 'ModelDelete']);
-        $Model = Model::find(intval($result));
+        Query::table('model')->insert(['name' => 'ModelDelete'])->then(function ($id) use ($Model) {
+            Model::find(intval($id))->then(function ($Model) {
+                $this->assertTrue($Model->exists());
+                $this->db->quit();
+            })->done();
+        });
 
-        $this->assertTrue($Model->exists());
+        $loop->run();
     }
 
     public function testHasAttribute()
@@ -146,12 +191,17 @@ final class ModelTest extends TestCase
             updated_at TIMESTAMP
         )');
 
-        $Model = Model::create(['name' => 'HasName']);
+        $loop = Loop::get();
 
-        $this->assertTrue($Model->exists());
-        $this->assertTrue(is_int($Model->id));
+        Model::create(['name' => 'HasName'])->then(function ($Model) {
+            $this->assertTrue($Model->exists());
+            $this->assertTrue(is_int($Model->id));
+            $this->assertEquals(date('Y-m-d H:i'), $Model->created_at->format('Y-m-d H:i'));
 
-        $this->assertEquals(date('Y-m-d H:i'), $Model->created_at->format('Y-m-d H:i'));
+            $this->db->quit();
+        })->done();
+
+        $loop->run();
     }
 
     public function testInsert()
@@ -168,11 +218,20 @@ final class ModelTest extends TestCase
         $Model = new Model(['name' => 'HasName']);
 
         $this->assertFalse($Model->exists());
-        $this->assertTrue($Model->insert());
-        $this->assertTrue($Model->exists());
-        $this->assertTrue(is_int($Model->id));
 
-        $this->assertEquals(date('Y-m-d H:i'), $Model->created_at->format('Y-m-d H:i'));
+        $loop = Loop::get();
+
+        $Model->insert()->then(function ($id) {
+            Model::find($id)->then(function ($Model) use ($id) {
+                $this->assertTrue($Model->exists());
+                $this->assertTrue(is_int($Model->id));
+                $this->assertEquals($id, $Model->id);
+                $this->assertEquals(date('Y-m-d H:i'), $Model->created_at->format('Y-m-d H:i'));
+                $this->db->quit();
+            })->done();
+        })->done();
+
+        $loop->run(); 
     }
 
     public function testPrimaryKey()
@@ -197,19 +256,20 @@ final class ModelTest extends TestCase
             updated_at TIMESTAMP
         )');
 
+        $loop = Loop::get();
+
         $Model = new Model(['name' => 'HasAnotherName']);
-        $Model->save();
+        $Model->save()->then(function ($Model) {
+            $this->assertTrue($Model->exists());
+            $this->assertEquals('HasAnotherName', $Model->name);
 
-        $this->assertTrue($Model->exists());
+            $Model->update(['name' => 'UpdatedName'], 'updated_at')->then(function ($Model) {
+                $this->assertEquals('UpdatedName', $Model->name);
+                $this->db->quit();
+            })->done();
+        })->done();
 
-        $result = Query::table('model')->update(['name' => 'UpdatedName'], 'updated_at');
-
-        $this->assertTrue($result);
-        $this->assertEquals('HasAnotherName', $Model->name);
-
-        $Model->refresh();
-
-        $this->assertEquals('UpdatedName', $Model->name);
+        $loop->run(); 
     }
 
     public function testSave()
@@ -227,16 +287,18 @@ final class ModelTest extends TestCase
         
         $this->assertFalse($Model->exists());
 
-        $Model->save();
+        $loop = Loop::get();
 
-        $this->assertTrue($Model->exists());
+        $Model->save()->then(function ($Model) {
+            $this->assertTrue($Model->exists());
+            $Model->name = 'UpdatedName';
+            $Model->save()->then(function ($Model) {
+                $this->assertEquals('UpdatedName', $Model->name);
+                $this->db->quit();
+            })->done();
+        })->done();
 
-        $Model->name = 'UpdatedName';
-        $Model->save();
-
-        $Model = Model::find($Model->id);
-
-        $this->assertEquals('UpdatedName', $Model->name);
+        $loop->run(); 
     }
 
     public function testUpdate()
@@ -250,17 +312,21 @@ final class ModelTest extends TestCase
             updated_at TIMESTAMP
         )');
 
-        // $Model = new Model(['name' => 'HasAnotherName']);
-        $id = intval(Query::table('model')->insert(['name' => 'ModelUpdate']));
-        $Model = Model::find($id);
+        $loop = Loop::get();
 
-        $this->assertEquals('ModelUpdate', $Model->getAttribute('name'));
+        Query::table('model')->insert(['name' => 'ModelUpdate'])->then(function ($id) {
+            Model::find($id)->then(function (Model $Model) use ($id) {
+                $this->assertEquals('ModelUpdate', $Model->getAttribute('name'));
 
-        $Model->setAttribute('name', 'AnotherName');
-        $Model->update();
-        $Model = Model::find($id);
+                $Model->setAttribute('name', 'AnotherName');
+                $Model->update()->then(function (Model $Model) use ($id) {
+                    $this->assertEquals('AnotherName', $Model->getAttribute('name'));
+                    $this->db->quit();
+                })->done();
+            })->done();
+        })->done();
 
-        $this->assertEquals('AnotherName', $Model->getAttribute('name'));
+        $loop->run(); 
     }
 
     public function testFloatParam()
@@ -273,6 +339,8 @@ final class ModelTest extends TestCase
             quantity INTEGER NOT NULL,
             price DECIMAL (10,2)
         )');
+
+        $loop = Loop::get();
 
         $date = \DateTime::createFromFormat('Ymd', '20200218');
         $settlementDate = $date->getTimestamp();
@@ -294,10 +362,17 @@ final class ModelTest extends TestCase
         $this->assertEquals($quantity, $Model->quantity);
         $this->assertTrue(is_int($Model->quantity));
         $this->assertEquals(27.05, $Model->price);
-        $this->assertTrue($Model->insert());
-        $this->assertEquals($date, $Model->settlement);
-        $this->assertEquals(3539, $Model->quantity);
-        $this->assertEquals(27.05, $Model->price);
+
+        $Model->insert()->then(function ($id) use ($Model, $date) {
+            $Model::find($id)->then(function ($Model) use ($date) {
+                $this->assertEquals($date, $Model->settlement);
+                $this->assertEquals(3539, $Model->quantity);
+                $this->assertEquals(27.05, $Model->price);
+                $this->db->quit();
+            })->done();
+        })->done();
+
+        $loop->run(); 
     }
 
     public function testPaginatedQuery()
@@ -311,37 +386,54 @@ final class ModelTest extends TestCase
             size VARCHAR (10) NOT NULL
         )');
 
+        $loop = Loop::get();
+
         Query::table('test_table')->insert([
             ['name' => 'First', 'color' => 'red', 'size' => 1],
             ['name' => 'Second', 'color' => null, 'size' => 2],
             ['name' => 'Fourth', 'color' => 'Green', 'size' => 3],
             ['name' => 'Fifth', 'color' => 'Green', 'size' => 4]
-        ]);
+        ])->done();
 
         (new TestModel)->insert([
             ['name' => 'Sixth', 'color' => 'Green', 'size' => 5],
             ['name' => 'Seventh', 'color' => 'Green', 'size' => 6],
             ['name' => 'Eight', 'color' => 'Yellow', 'size' => 7],
             ['name' => 'Ninth', 'color' => 'Green', 'size' => 8]
-        ]);
+        ])->done();
 
         $query = new PaginatedQuery(TestModel::class, 3);
         $query->where('color', 'Green');
 
-        $rows = $query->get(1);
+        $query->get(1)->then(function ($rows) use ($query) {
+            $query->total()->then(function ($total) use ($query) {
+                $this->assertEquals(5, $total);
+                $query->pages()->then(function ($pages) {
+                    $this->assertEquals(2, $pages);
+                })->done();
+            })->done();
 
-        $this->assertEquals(5, $query->total());
-        $this->assertEquals(2, $query->pages());
-        $this->assertCount(3, $rows);
-        $this->assertTrue($rows->column('name')->contains('Fourth'));
-        $this->assertTrue($rows->column('name')->contains('Fifth'));
-        $this->assertTrue($rows->column('name')->contains('Sixth'));
+            $this->assertCount(3, $rows);
+            $this->assertTrue($rows->column('name')->contains('Fourth'));
+            $this->assertTrue($rows->column('name')->contains('Fifth'));
+            $this->assertTrue($rows->column('name')->contains('Sixth'));
+        }, function ($e) { echo $e->getMessage()."\n"; $this->db->quit(); })->done();
 
-        $rows = $query->get(2);
+        $query->get(2)->then(function ($rows) use ($query) {
+            $this->assertCount(2, $rows);
+            $this->assertTrue($rows->column('name')->contains('Seventh'));
+            $this->assertTrue($rows->column('name')->contains('Ninth'));
 
-        $this->assertCount(2, $rows);
-        $this->assertTrue($rows->column('name')->contains('Seventh'));
-        $this->assertTrue($rows->column('name')->contains('Ninth'));
+            $query->pageData()->then(function ($data) {
+                $this->assertEquals(5, $data['total']);
+                $this->assertEquals(2, $data['pages']);
+                $this->assertEquals(3, $data['perPage']);
+
+                $this->db->quit();
+            })->done();
+        }, function ($e) { echo $e->getMessage()."\n"; $this->db->quit(); })->done();
+
+        $loop->run(); 
     }
 
     public function testJsonSerialization()

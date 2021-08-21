@@ -3,7 +3,7 @@
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
 use Ajthenewguy\Php8ApiServer\Collection;
-use Ajthenewguy\Php8ApiServer\Exceptions\ValidationException;
+use React\Promise\PromiseInterface;
 
 class Validator
 {
@@ -34,18 +34,6 @@ class Validator
             return $this->errors;
         }
         return null;
-    }
-
-    /**
-     * @param iterable $data
-     * @return bool
-     */
-    public function fails(iterable $data = []): bool
-    {
-        $this->getValidated($data);
-        $errors = $this->errors();
-        
-        return ($errors && !$errors->empty());
     }
 
     /**
@@ -84,15 +72,6 @@ class Validator
             return $this->messages->toArray();
         }
         return [];
-    }
-
-    /**
-     * @param iterable $data
-     * @return bool
-     */
-    public function passes(iterable $data = []): bool
-    {
-        return !$this->fails($data);
     }
 
     /**
@@ -156,19 +135,6 @@ class Validator
         return $this;
     }
 
-    /**
-     * @param iterable $data
-     * @return array
-     */
-    public function validate(iterable $data = []): array
-    {
-        if ($this->fails($data)) {
-            throw new ValidationException('There were problems with your input.');
-        }
-
-        return $this->validated;
-    }
-
     protected function getRules(string $name): ?array
     {
         return $this->rules->first(function ($rules, $_name) use ($name) {
@@ -178,12 +144,14 @@ class Validator
 
     /**
      * @param iterable $data
-     * @return array
+     * @return PromiseInterface
      */
-    protected function getValidated(iterable $data = []): array
+    public function validate(iterable $data = []): PromiseInterface
     {
+        $pending = [];
+        $errors = new Collection();
         $this->validated = [];
-        $this->errors = new Collection();
+        // $this->errors = new Collection();
 
         $RequiredRules = $this->rules->map(function (array $rules) {
             return array_filter($rules, function (Rule $Rule) {
@@ -193,44 +161,52 @@ class Validator
             return $Rule !== null;
         });
 
-        $RequiredRules->each(function (Rule $Rule, string $attribute) use ($data) {
+        $RequiredRules->each(function (Rule $Rule, string $attribute) use ($data, $errors) {
             if (!isset($data[$attribute])) {
                 $message = str_replace([':attribute', '_'], [$attribute, ' '], $Rule->getMessage($attribute));
-                $errors = $this->errors->get($attribute) ?? [];
-                if (!in_array($message, $errors)) {
-                    $errors[] = $message;
+                $_errors = $errors->get($attribute) ?? [];
+                if (!in_array($message, $_errors)) {
+                    $_errors[] = $message;
                 }
-                $this->errors->set($attribute, $errors);
+                $errors->set($attribute, $_errors);
             }
         });
 
         foreach ($data as $attribute => $value) {
             if ($this->hasRuleFor($attribute)) {
                 $rules = $this->getRules($attribute);
-                $valid = true;
 
                 foreach ($rules as $Rule) {
                     if (is_null($value) && !($Rule instanceof RequiredRule)) {
                         continue;
                     }
-                    if (!$Rule->passes($attribute, $value)) {
-                        $valid = false;
-                        $message = str_replace([':attribute', '_'], [$attribute, ' '], $Rule->getMessage($attribute));
-                        $errors = $this->errors->get($attribute) ?? [];
-                        if (!in_array($message, $errors)) {
-                            $errors[] = $message;
-                        }
-                        $this->errors->set($attribute, $errors);
-                    }
-                }
 
-                if ($valid) {
-                    $this->validated[$attribute] = $value;
+                    $pending[] = $Rule->passes($attribute, $value);
                 }
             }
         }
 
-        return $this->validated;
+        return \React\Promise\all($pending)->then(function ($resolved) use ($errors, $data) {
+            $validated = [];
+
+            foreach ($resolved as $rule) {
+                $Rule = $rule['Rule'];
+                $attribute = $rule['field'];
+
+                if ($rule['result'] === true) {
+                    $validated[$attribute] = $data[$attribute];
+                } else {
+                    $message = str_replace([':attribute', '_'], [$attribute, ' '], $Rule->getMessage($attribute));
+                    $_errors = $errors->get($attribute) ?? [];
+                    if (!in_array($message, $_errors)) {
+                        $_errors[] = $message;
+                    }
+                    $errors->set($attribute, $_errors);
+                }
+            }
+
+            return [$validated, $errors->toArray()];
+        });
     }
 
     /**

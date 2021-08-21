@@ -3,7 +3,7 @@
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use Ajthenewguy\Php8ApiServer\Application;
-use \Ajthenewguy\Php8ApiServer\Commands;
+use Ajthenewguy\Php8ApiServer\Commands;
 
 /**
  * Core application CLI commands.

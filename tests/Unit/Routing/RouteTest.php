@@ -13,6 +13,7 @@ class RouteTest extends TestCase
 {
     public function testGetAction()
     {
+        Route::$Table = new Collection();
         Route::get('/', function () {
             return 'Home';
         });
@@ -25,6 +26,7 @@ class RouteTest extends TestCase
 
     public function testGetId()
     {
+        Route::$Table = new Collection();
         Route::get('/', function () {
             return 'Home';
         });
@@ -37,6 +39,7 @@ class RouteTest extends TestCase
 
     public function testGetMethod()
     {
+        Route::$Table = new Collection();
         Route::get('/', function () {
             return 'Home';
         });
@@ -49,6 +52,7 @@ class RouteTest extends TestCase
 
     public function testGetParameters()
     {
+        Route::$Table = new Collection();
         Route::get('/', function () {
             return 'Home';
         });
@@ -107,6 +111,7 @@ class RouteTest extends TestCase
 
     public function testLookup()
     {
+        Route::$Table = new Collection();
         Route::get('/products/{name}', ['Controller', 'method']);
         Route::get('/page/{pageId}/user/{userId?}', ['Controller', 'method']);
         Route::get('/business/{businessId}/employee/{employeeId}', ['Controller', 'method']);
@@ -124,6 +129,7 @@ class RouteTest extends TestCase
 
     public function testLookupNotFound()
     {
+        Route::$Table = new Collection();
         Route::get('/business/{businessId}/employee/{employeeId}', ['Controller', 'method']);
 
         $this->expectException(NotFoundError::class);
@@ -133,10 +139,16 @@ class RouteTest extends TestCase
 
     public function testLookupMethodNotAllowed()
     {
+        Route::$Table = new Collection();
         Route::get('/business/{businessId}/employee/{employeeId?}', ['Controller', 'method']);
 
         $this->expectException(MethodNotAllowedError::class);
 
         Route::lookup('POST', '/business/45/employee');
+    }
+
+    public function tearDown(): void
+    {
+        Route::$Table = new Collection();
     }
 }

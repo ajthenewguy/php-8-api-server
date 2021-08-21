@@ -2,15 +2,17 @@
 
 namespace Ajthenewguy\Php8ApiServer\Database;
 
+use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Collection;
-use Ajthenewguy\Php8ApiServer\Database\Drivers\Driver as DatabaseDriver;
+use Ajthenewguy\Php8ApiServer\Database\Drivers\Driver;
 use Ajthenewguy\Php8ApiServer\Database\Grammar\Join;
 use Ajthenewguy\Php8ApiServer\Exceptions\QueryException;
 use Ajthenewguy\Php8ApiServer\Traits\Database\Where;
 use Ajthenewguy\Php8ApiServer\Traits\RequiresServiceContainer;
+use React\Promise\PromiseInterface;
 
-class Query {
-
+class Query
+{
     use Where, RequiresServiceContainer;
 
     private static QueryException $lastError;
@@ -35,8 +37,6 @@ class Query {
 
     protected array $order;
 
-    protected int $rowCount;
-
     protected array $select = ['*'];
 
     protected string $type = 'SELECT';
@@ -54,9 +54,19 @@ class Query {
         }
     }
 
-    public static function driver(): ?\PDO
+    public static function driver(): ?Driver
     {
-        return self::app()->instance(DatabaseDriver::class);
+        return Application::singleton()->instance(Driver::class);
+    }
+
+    public static function exec(string $sql)
+    {
+        return (new static())->driver()->query($sql);
+    }
+
+    public static function query(string $sql, array $params = [])
+    {
+        return (new static())->driver()->query($sql, $params);
     }
 
     public static function raw($value): \stdClass
@@ -69,21 +79,6 @@ class Query {
     public static function table(string $table): Query
     {
         return (new static())->setTable($table);
-    }
-
-    public static function transaction(callable $callback)
-    {
-        $inTransaction = (bool) static::driver()->inTransaction();
-        $return = null;
-        try {
-            if (!$inTransaction) static::driver()->beginTransaction();
-            $return = $callback();
-            if (!$inTransaction) static::driver()->commit();
-        } catch (\Throwable $e) {
-            if (!$inTransaction) static::driver()->rollBack();
-            throw $e;
-        }
-        return $return;
     }
 
     public function addSelect(): self
@@ -104,71 +99,20 @@ class Query {
         return $this;
     }
 
-    public function count(): int
+    public function count(): PromiseInterface
     {
         $this->type = 'COUNT';
-        $statement = $this->exe($this->compileQuery());
-        if (!$statement) {
-            $error = static::driver()->errorInfo();
-            static::$lastError = new QueryException($error[2], $error[0], $error[1]);
-            throw static::$lastError;
-        }
-        $result = $statement->fetchColumn();
+        $sql = $this->compileQuery();
 
-        return (int) $result ?? 0;
+        return $this->driver()->count($sql, $this->getParams());
     }
 
-    public function delete(): bool
+    public function delete(): PromiseInterface
     {
         $this->type = 'DELETE';
-        return $this->exe($this->compileQuery());
-    }
+        $sql = $this->compileQuery();
 
-    /**
-     * Executes supplied SQL and returns:
-     *  \PDOStatement - SELECT statements
-     *  string        - INSERT statements (single row)
-     *  int           - INSERT statements (multiple rows)
-     *  boolean       - UPDATE, DELETE, all other statements
-     * 
-     * @return mixed
-     */
-    public function exe(string $sql)
-    {
-        if (!static::driver()) {
-            throw new \RuntimeException('No PDO driver available.');
-        }
-
-        if (isset($this->parent)) {
-            throw new \RuntimeException('Subquery cannot be executed independently.');
-        }
-
-        $this->rowCount = 0;
-
-        if ($this->isMultiInsert()) {
-            return static::transaction(function () use ($sql) {
-                $stmt = $this->bindParameters($this->prepareStatement($sql), $this->getParams());
-                if ($stmt->execute()) {
-                    $this->rowCount = $stmt->rowCount();
-                }
-                return $this->rowCount;
-            });
-        } else {
-            $stmt = $this->bindParameters($this->prepareStatement($sql), $this->getParams());
-            if ($result = $stmt->execute()) {
-                $this->rowCount = $stmt->rowCount();
-            }
-        }
-
-        if (substr($sql, 0, 6) === 'SELECT') {
-            return $stmt;
-        }
-
-        if (substr($sql, 0, 6) === 'INSERT' && !$this->isMultiInsert()) {
-            return static::insertId();
-        }
-
-        return $result;
+        return $this->driver()->delete($sql, $this->getParams());
     }
 
     /**
@@ -217,7 +161,7 @@ class Query {
      * 
      * @return string
      */
-    public function getSql(): string
+    public function toSql(): string
     {
         $sql = $this->compileQuery();
         $params = $this->getParams();
@@ -228,76 +172,20 @@ class Query {
         return $sql;
     }
 
-    /**
-     * @return int
-     */
-    public function rowCount(): int
-    {
-        if (isset($this->rowCount)) {
-            return $this->rowCount;
-        }
-        return -1;
-    }
-
-    private function prepareStatement(string $sql): \PDOStatement
-    {
-        try {
-            $stmt = static::driver()->prepare($sql);
-        } catch (\PDOException $e) {
-            throw $e;
-        }
-
-        if (!$stmt) {
-            $error = static::driver()->errorInfo();
-            static::$lastError = new QueryException($error[2], $error[0], $error[1]);
-            throw static::$lastError;
-        }
-        return $stmt;
-    }
-
-    private function bindParameters(\PDOStatement $stmt, array $input_parameters): \PDOStatement
-    {
-        foreach ($input_parameters as $key => $value) {
-            $param = \PDO::PARAM_STR;
-            if (is_int($value)) $param = \PDO::PARAM_INT;
-            elseif (is_bool($value)) $param = \PDO::PARAM_BOOL;
-            elseif (is_null($value)) $param = \PDO::PARAM_NULL;
-                
-            if ($param !== false) $stmt->bindValue($key, $value, $param);
-        }
-        return $stmt;
-    }
-
-    public function first()
+    public function first(): PromiseInterface
     {
         $this->type = 'SELECT';
-        $statement = $this->exe($this->compileQuery());
-        if (!$statement) {
-            $error = static::driver()->errorInfo();
-            static::$lastError = new QueryException($error[2], $error[0], $error[1]);
-            throw static::$lastError;
-        }
-        $result = $statement->fetch(\PDO::FETCH_OBJ);
-        if (!$result) {
-            $result = null;
-        }
-        return $result;
+        $sql = $this->compileQuery();
+
+        return $this->driver()->first($sql, $this->getParams());
     }
 
-    public function get(): Collection
+    public function get(): PromiseInterface
     {
         $this->type = 'SELECT';
-        $statement = $this->exe($this->compileQuery());
-        if (!$statement) {
-            $error = static::driver()->errorInfo();
-            static::$lastError = new QueryException($error[2], $error[0], $error[1]);
-            throw static::$lastError;
-        }
-        $result = $statement->fetchAll(\PDO::FETCH_OBJ);
-        if (!$result) {
-            $result = null;
-        }
-        return new Collection($result);
+        $sql = $this->compileQuery();
+
+        return $this->driver()->get($sql, $this->getParams());
     }
 
     /**
@@ -348,18 +236,20 @@ class Query {
     /**
      * @param array $data
      * @param string|null $createdField
-     * @return bool|string
+     * @return mixed
      */
-    public function insert(array $data, ?string $createdField = null)
+    public function insert(array $data, ?string $createdField = null): PromiseInterface
     {
         if ($this->isMultiInsert($data)) {
             $data = $this->normalizeMultiInsertArray($data);
         }
-        
+
         $this->insert = $data;
         $this->createdField = $createdField;
         $this->type = 'INSERT';
-        return $this->exe($this->compileQuery());
+        $sql = $this->compileQuery();
+
+        return $this->driver()->insert($sql, $this->getParams());
     }
 
     public static function getLastError(): ?QueryException
@@ -368,11 +258,6 @@ class Query {
             return static::$lastError;
         }
         return null;
-    }
-
-    public static function insertId()
-    {
-        return static::driver()->lastInsertId();
     }
 
     /**
@@ -453,14 +338,18 @@ class Query {
     /**
      * @param array $data
      * @param string|null $updatedField
-     * @return bool
+     * @return PromiseInterface
      */
-    public function update(array $data, ?string $updatedField = null): bool
+    public function update(array $data, ?string $updatedField = null)
     {
         $this->update = $data;
         $this->updatedField = $updatedField;
         $this->type = 'UPDATE';
-        return $this->exe($this->compileQuery());
+
+        $sql = $this->compileQuery();
+
+        return $this->driver()->update($sql, $this->getParams());
+        // return $this->exe($this->compileQuery());
     }
 
     public function value(string $column)
@@ -492,7 +381,7 @@ class Query {
         } elseif (is_array($args[0])) {
             $this->order = array_merge($this->order, $args[0]);
         }
-        
+
         return $this;
     }
 
@@ -500,6 +389,19 @@ class Query {
     {
         $this->table = $table;
         return $this;
+    }
+
+    private function bindParameters(\PDOStatement $stmt, array $input_parameters): \PDOStatement
+    {
+        foreach ($input_parameters as $key => $value) {
+            $param = \PDO::PARAM_STR;
+            if (is_int($value)) $param = \PDO::PARAM_INT;
+            elseif (is_bool($value)) $param = \PDO::PARAM_BOOL;
+            elseif (is_null($value)) $param = \PDO::PARAM_NULL;
+
+            if ($param !== false) $stmt->bindValue($key, $value, $param);
+        }
+        return $stmt;
     }
 
     /**
@@ -610,14 +512,16 @@ class Query {
             case 'COUNT':
             case 'SELECT':
                 $sql = sprintf("SELECT %s FROM %s", $this->compileSelect($type), $tables);
-            break;
+                break;
+
             case 'DELETE':
                 $sql = sprintf("DELETE FROM %s", $tables);
-            break;
+                break;
+
             case 'INSERT':
                 $input_parameters ??= $this->insert;
                 $sql = sprintf("INSERT INTO %s (", $tables);
-                
+
                 if ($this->isMultiInsert($input_parameters)) {
                     foreach ($input_parameters[0] as $key => $val) {
                         $sql .= sprintf("`%s`, ", $key);
@@ -630,7 +534,7 @@ class Query {
                 if (isset($this->createdField) && !isset($input_parameters[$this->createdField])) {
                     $sql .= sprintf("`%s`, ", $this->createdField);
                 }
-                
+
                 $sql = rtrim(trim($sql), ',');
                 $sql .= ') VALUES ';
 
@@ -659,8 +563,8 @@ class Query {
                     $sql = rtrim(trim($sql), ',');
                     $sql .= ')';
                 }
-            break;
-            break;
+                break;
+
             case 'UPDATE':
                 $input_parameters ??= $this->update;
                 $sql = sprintf("UPDATE %s SET", $tables);
@@ -669,31 +573,31 @@ class Query {
                     $sql .= sprintf(" `%s` = :%s,", $key, $key);
                 }
                 if (isset($this->updatedField) && !isset($input_parameters[$this->updatedField])) {
-                    $sql .= ' `'.$this->updatedField.'` = CURRENT_TIMESTAMP';
+                    $sql .= ' `' . $this->updatedField . '` = CURRENT_TIMESTAMP';
                 } else {
                     $sql = rtrim($sql, ',');
                 }
-            break;
+                break;
         }
 
         $param_key = count($input_parameters ?? []);
 
         if (isset($this->join)) {
             $this->join->each(function (Join $join) use (&$sql) {
-                $sql .= ' '.$join->compile($param_key);
+                $sql .= ' ' . $join->compile($param_key);
             });
         }
 
         if ($where = $this->compileWhere(false, $param_key)) {
-            $sql .= ' WHERE '.$where;
+            $sql .= ' WHERE ' . $where;
         }
 
         if (isset($this->group)) {
-            $sql .= ' GROUP BY '.implode(', ', $this->group);
+            $sql .= ' GROUP BY ' . implode(', ', $this->group);
         }
 
         if ($having = $this->compileHaving()) {
-            $sql .= ' HAVING '.$having;
+            $sql .= ' HAVING ' . $having;
         }
 
         if ($type !== 'COUNT') {
@@ -704,7 +608,7 @@ class Query {
                     if ($key[0] === '`' && $key[-1] === '`' && false !== strpos($key, '.') && substr_count($key, '`') === 2) {
                         $key = str_replace('.', '`.`', $key);
                     }
-                    $orderBys[] = $key.($dir === 'DESC' ? ' DESC' : ' ASC');
+                    $orderBys[] = $key . ($dir === 'DESC' ? ' DESC' : ' ASC');
                 }
                 $sql .= implode(', ', $orderBys);
             }
@@ -739,12 +643,12 @@ class Query {
             });
         }
 
-        foreach ($selectArray as $key => $value) {
+        foreach ($selectArray as $value) {
             if (is_string($value)) {
                 $selects[] = $value;
             } elseif (is_array($value)) {
                 foreach ($value as $alias => $select) {
-                    $selects[] = $select.' AS '.$alias;
+                    $selects[] = $select . ' AS ' . $alias;
                 }
             }
         }
@@ -772,7 +676,7 @@ class Query {
         } else {
             $tables = $this->table;
             if (isset($this->alias)) {
-                $tables .= ' AS '.$this->alias;
+                $tables .= ' AS ' . $this->alias;
             }
         }
 
@@ -806,25 +710,31 @@ class Query {
 
     public function __call($method, $args)
     {
-        if ($method === 'select') $method = 'internalSelect';
-        if (method_exists($this, $method)) {
-            return call_user_func_array(array($this, $method), $args);
+        if ($method === 'select') {
+            return $this->internalSelect(...$args);
         }
-        return $this->internalSelect(...$args);
+
+        $Driver = Driver::create();
+        if (method_exists($Driver, $method)) {
+            return call_user_func_array([$Driver, $method], $args);
+        }
     }
 
     public static function __callStatic($method, $args)
     {
-        $instance = new static();
-        if ($method == 'select') $method = 'internalSelect';
-        if (method_exists($instance, $method)) {
-            return call_user_func_array(array($instance, $method), $args);
+        if ($method === 'select' || $method === 'internalSelect') {
+            $instance = new static();
+            return $instance->internalSelect(...$args);
         }
-        return $instance->internalSelect(...$args);
+
+        $Driver = Driver::create();
+        if (method_exists($Driver, $method)) {
+            return call_user_func_array([$Driver, $method], $args);
+        }
     }
 
     public function __toString(): string
     {
-        return $this->getSql();
+        return $this->toSql();
     }
 }

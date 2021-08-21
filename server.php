@@ -2,12 +2,14 @@
 <?php declare(strict_types=1);
 
 require __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/config/routes.php';
 
 use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Http\Middleware;
 
 $Application = Application::singleton(Dotenv\Dotenv::createImmutable(__DIR__));
+
+require __DIR__ . '/config/middleware.php';
+require __DIR__ . '/config/routes.php';
 
 if (isset($argv[1])) {
     require __DIR__ . '/config/commands.php';
@@ -16,9 +18,7 @@ if (isset($argv[1])) {
     $Application->runCommand($argv[1], ...$arguments);
 } else {
     $http = new React\Http\HttpServer(
-        new Middleware\AccessLogging(),
-        new Middleware\AuthorizationMiddleware(),
-        new Middleware\RouteMiddleware()
+        ...$Application->handleRequest()
     );
     $socket = new React\Socket\SocketServer($_ENV['APP_URL']);
 

@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class DateTimeRule extends RegexRule
 {
     protected string $name = 'date-time';
@@ -67,15 +69,15 @@ class DateTimeRule extends RegexRule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
         if ($passes = parent::passes($name, $input)) {
             $date = \DateTime::createFromFormat($this->format, (string) $input);
             $passes = $date && $date->format($this->format) === $input;
         }
 
-        return $passes;
+        return $this->resolve($name, $input, $passes);
     }
 }

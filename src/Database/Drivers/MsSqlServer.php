@@ -6,29 +6,24 @@ class MsSqlServer extends Driver {
 
     protected int $port = 3306;
 
-    public static function create($Config): \PDO
+    public static function create(mixed $config = []): ?Driver
     {
-        $driver = new Mysql($Config);
-        $driver->requireConfigKey('host|socket');
-        $driver->requireConfigKey('user|username');
-        $Server = $driver->Config->Server;
-        $username = $driver->Config->user ?? $driver->Config->username ?? null;
-        $password = $driver->Config->password ?? null;
-
-        if (isset($driver->Config->port)) {
-            $Server .= ','.$driver->Config->port;
-        } elseif (isset($driver->Config->Port)) {
-            $Server .= ','.$driver->Config->Port;
+        if ($config) {
+            static::setConfig($config);
         }
 
-        $dsn = static::makeDsn([
-            'Server' => $Server,
-            'Database' => $driver->Config->Database ?? null,
-        ]);
+        static::requireConfigKey('host|socket');
+        static::requireConfigKey('user|username');
+        $Server = static::$Config->Server;
+        $username = static::$Config->user ?? static::$Config->username ?? null;
+        $password = static::$Config->password ?? null;
 
-        return new \PDO('sqlsrv: '.$dsn, $username, $password, [
-            \PDO::ATTR_EMULATE_PREPARES => false,
-            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
-        ]);
+        if (isset(static::$Config->port)) {
+            $Server .= ','.static::$Config->port;
+        } elseif (isset(static::$Config->Port)) {
+            $Server .= ','.static::$Config->Port;
+        }
+
+        return null;
     }
 }

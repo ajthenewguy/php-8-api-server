@@ -3,8 +3,9 @@
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
 use Ajthenewguy\Php8ApiServer\Filesystem\File;
+use React\Promise;
 
-class FileRule extends RegexRule
+class FileRule extends Rule
 {
     protected string $name = 'file';
 
@@ -19,16 +20,16 @@ class FileRule extends RegexRule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
         if (is_string($input)) {
             $File = new File($input);
 
-            return $File->exists();
+            return $this->resolve($name, $input, $File->exists());
         }
 
-        return false;
+        return $this->resolve($name, $input, false);
     }
 }

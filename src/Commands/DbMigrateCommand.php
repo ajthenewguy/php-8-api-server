@@ -73,15 +73,12 @@ final class DbMigrateCommand extends Command
 
                     $MigrationClass = new $class;
 
-                    Query::transaction(function () use ($MigrationClass, $migrationName, $batch) {
-                        $MigrationClass->up();
+                    $MigrationClass->up();
 
-                        Query::table('migrations')->insert([
-                            'migration' => $migrationName,
-                            'batch' => $batch + 1
-                        ]);
-                    });
-
+                    Query::table('migrations')->insert([
+                        'migration' => $migrationName,
+                        'batch' => $batch + 1
+                    ]);
 
                     $stdio->write('Migrated ' . $MigrationFile->getFilename() . '.' . PHP_EOL);
                 }

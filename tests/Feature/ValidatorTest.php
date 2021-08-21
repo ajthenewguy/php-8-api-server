@@ -4,11 +4,15 @@ namespace Tests\Feature;
 
 use Ajthenewguy\Php8ApiServer\Collection;
 use Ajthenewguy\Php8ApiServer\Exceptions\ValidationException;
+use Ajthenewguy\Php8ApiServer\Facades\DB;
 use Ajthenewguy\Php8ApiServer\Validation\Validator;
+use React\EventLoop\Loop;
 use Tests\TestCase;
 
 final class ValidatorTest extends TestCase
 {
+    use \Tests\UsesDatabase;
+
     public $v;
 
     public function setUp(): void
@@ -24,47 +28,62 @@ final class ValidatorTest extends TestCase
 
     public function testErrors()
     {
-        $this->v->fails(['name' => '', 'date' => '2014-1-10']);
-        $nameErrorMessages = ['Name is required'];
-        $dateErrorMessages = ['The "date" field format is invalid.'];
-        $expected = new Collection([
-            'name' => $nameErrorMessages,
-            'date' => $dateErrorMessages
-        ]);
-        $actual = $this->v->errors();
+        $this->v->validate(['name' => '', 'date' => '2014-1-10'])->then(function ($result) {
+            $expected = [
+                'name' => ['Name is required'],
+                'date' => ['The "date" field format is invalid.']
+            ];
+            // print "\n".__METHOD__.':'.__LINE__."\n";
+            // var_dump($result);
 
-        $this->assertEquals($expected, $actual);
-        $this->assertEquals($nameErrorMessages, $this->v->errors()->get('name'));
-        $this->assertEquals($dateErrorMessages, $this->v->errors()->get('date'));
-    }
+            // array(2) [
+            //     [0]=> array(0) [ ]
+            //     [1]=> array(1) [
+            //         ["name"]=> array(1) [
+            //             [0]=> string(16) "Name is required"
+            //         ]
+            //     ]
+            // ]
+            $this->assertEquals($expected, $result[1]);
+        })->done();
 
-    public function testFails()
-    {
-        $this->assertTrue($this->v->fails(['name' => '']));
-        $this->assertTrue($this->v->fails(['name' => null]));
-        $this->assertTrue($this->v->fails(['name' => 'Rob']));
-        $this->assertFalse($this->v->fails(['name' => 'Bob']));
-    }
+        $this->v->validate(['name' => ''])->then(function ($result) {
+            $expected = [
+                'name' => ['Name is required']
+            ];
+            $this->assertEquals($expected, $result[1]);
+        })->done();
 
-    public function testPasses()
-    {
-        $this->assertTrue($this->v->passes([
+        $this->v->validate(['name' => null])->then(function ($result) {
+            $expected = [
+                'name' => ['Name is required']
+            ];
+            $this->assertEquals($expected, $result[1]);
+        })->done();
+
+        $this->v->validate(['name' => 'Rob'])->then(function ($result) {
+            $expected = [
+                'name' => ['The "name" field format is invalid.']
+            ];
+            $this->assertEquals($expected, $result[1]);
+        })->done();
+        $this->v->validate([
             'name' => 'Bob',
-            'date' => '2012-01-10'
-        ]));
-        $this->assertTrue($this->v->passes([
+            'date' => '2012-01-1'
+        ])->then(function ($result) {
+            $expected = [
+                'date' => ['The "date" field format is invalid.']
+            ];
+            $this->assertEquals($expected, $result[1]);
+        })->done();
+
+        $this->v->validate([
             'name' => 'Bob',
             'date' => '2012-01-10',
             'datetime' => '2018-03-20T09:12:28Z'
-        ]));
-        $this->assertFalse($this->v->passes([
-            'name' => 'Rob',
-            'date' => '2012-01-10'
-        ]));
-        $this->assertFalse($this->v->passes([
-            'name' => 'Bob',
-            'date' => '2012-01-1'
-        ]));
+        ])->then(function ($result) {
+            $this->assertEquals([], $result[1]);
+        })->done();
     }
 
     public function testMessages()
@@ -77,20 +96,67 @@ final class ValidatorTest extends TestCase
         $this->assertEquals($expected, $actual);
     }
 
-    public function testValidatePass()
+    public function testExistsRule()
     {
-        $expected = ['name' => 'Bob'];
-        $actual = $this->v->validate(['name' => 'Bob']);
+        $this->setUpDatabase();
 
-        $this->assertEquals($expected, $actual);
+        $loop = Loop::get();
+
+        $this->db->exec('CREATE TABLE IF NOT EXISTS test (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR (30) NOT NULL,
+            color VARCHAR (10) DEFAULT NULL,
+            size INTEGER (2) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT (strftime(\'%s\',\'now\')),
+            updated_at TIMESTAMP
+        )');
+
+        $v = new Validator([
+            'test_id' => ['exists:test'],
+            'test_name' => ['exists:test,name'],
+        ]);
+
+        // $this->assertTrue($v->fails(['test_name' => 'First']));
+        $v->validate(['test_name' => 'First'])->then(function ($result) {
+            $expected = [
+                'test_name' => ['The "test name" must exist in the database.']
+            ];
+            $this->assertEquals($expected, $result[1]);
+        })->done();
+
+        $v->validate()->then(function ($result) use ($v) {
+            DB::table('test')->insert(['name' => 'First', 'color' => 'red', 'size' => 1])->then(function ($id) use ($v) {
+                $v->validate(['test_id' => 5345348573495])->then(function ($result) {
+                    $expected = [
+                        'test_id' => ['The "test id" must exist in the database.']
+                    ];
+                    $this->assertEquals($expected, $result[1]);
+                })->done();
+
+                $v->validate([
+                    'test_id' => $id
+                ])->then(function ($result) {
+                    $this->assertEquals([], $result[1]);
+                })->done();
+
+                $v->validate([
+                    'test_name' => 'First'
+                ])->then(function ($result) {
+                    $this->assertEquals([], $result[1]);
+                })->done();
+
+                $v->validate([
+                    'test_id' => $id,
+                    'test_name' => 'First'
+                ])->then(function ($result) {
+                    $this->assertEquals([], $result[1]);
+                })->done();
+
+                $this->db->quit();
+            })->done();
+        })->done();        
+
+        $loop->run();
+        $this->tearDownDatabase();
     }
-
-    public function testValidateFail()
-    {
-        $this->expectException(ValidationException::class);
-
-        $this->v->validate(['name' => '']);
-    }
-
-
 }

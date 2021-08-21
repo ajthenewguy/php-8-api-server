@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Validation;
 
+use React\Promise;
+
 class EmailRule extends RegexRule
 {
     protected string $name = 'email';
@@ -17,10 +19,10 @@ class EmailRule extends RegexRule
     /**
      * @param string $name
      * @param mixed $input
-     * @return bool
+     * @return Promise\PromiseInterface
      */
-    public function passes(string $name, $input): bool
+    public function passes(string $name, $input): Promise\PromiseInterface
     {
-        return filter_var($input, FILTER_VALIDATE_EMAIL) !== false;
+        return $this->resolve($name, $input, filter_var($input, FILTER_VALIDATE_EMAIL) !== false);
     }
 }

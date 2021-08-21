@@ -2,29 +2,126 @@
 
 namespace Ajthenewguy\Php8ApiServer\Database\Drivers;
 
+use Ajthenewguy\Php8ApiServer\Collection;
+use Evenement\EventEmitterInterface;
+use React\MySQL\ConnectionInterface;
+use React\MySQL\Factory;
+use React\MySQL\QueryResult;
+use React\Promise\PromiseInterface;
+
 class Mysql extends Driver {
+
+    protected ConnectionInterface $proxied;
 
     protected int $port = 3306;
 
-    public static function create($Config): \PDO
+    protected function __construct(EventEmitterInterface|ConnectionInterface $driver)
     {
-        $driver = new Mysql($Config);
-        $driver->requireConfigKey('host|socket');
-        $driver->requireConfigKey('user|username');
-        $username = $driver->Config->user ?? $driver->Config->username ?? null;
-        $password = $driver->Config->password ?? null;
-        $dsn = static::makeDsn([
-            'host' => $driver->Config->host ?? null,
-            'unix_socket' => $driver->Config->socket ?? null,
-            'port' => $driver->Config->port ?? $driver->port,
-            'dbname' => $driver->Config->name ?? null,
-            'password' => $password,
-            'charset' => $driver->Config->charset ?? null
-        ]);
+        $this->proxied = $driver;
+    }
 
-        return new \PDO('mysql: '.$dsn, $username, $password, [
-            \PDO::ATTR_EMULATE_PREPARES => false,
-            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
-        ]);
+    public static function create(mixed $config = []): ?Driver
+    {
+        if ($config) {
+            static::setConfig($config);
+        }
+
+        static::requireConfigKey('host|socket');
+        static::requireConfigKey('user|username');
+        $username = static::$Config->user ?? static::$Config->username ?? null;
+        $password = static::$Config->password ?? null;
+        $port = static::$Config->port ?? static::$port ?? null;
+        $host = static::$Config->host . ($port ? ':' . $port : '');
+
+        $factory = new Factory();
+
+        return new static($factory->createLazyConnection(
+            sprintf('%s:%s@%s/%s', $username, $password, $host, static::$Config->name)
+        ));
+    }
+
+    public function count(string $sql, array $params = []): PromiseInterface
+    {
+        return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
+            return $Result->resultRows[0]['COUNT(*)'] ?? 0;
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            echo $error->getTraceAsString() . PHP_EOL;
+        });
+    }
+
+    public function delete(string $sql, array $params = []): PromiseInterface
+    {
+        return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
+            return $Result->affectedRows;
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            echo $error->getTraceAsString() . PHP_EOL;
+        });
+    }
+
+    public function first(string $sql, array $params = []): PromiseInterface
+    {
+        return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
+            return $Result->resultRows[0] ?? null;
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            echo $error->getTraceAsString() . PHP_EOL;
+        });
+    }
+
+    public function get(string $sql, array $params = []): PromiseInterface
+    {
+        return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
+            return new Collection($Result->resultRows ?? []);
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            echo $error->getTraceAsString() . PHP_EOL;
+        });
+    }
+
+    public function insert(string $sql, array $params = []): PromiseInterface
+    {
+        return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
+            if ($Result->affectedRows === 1) {
+                return $Result->insertId;
+            }
+            return $Result->affectedRows;
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            echo $error->getTraceAsString() . PHP_EOL;
+        });
+    }
+
+    public function update(string $sql, array $params = []): PromiseInterface
+    {
+        return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
+            return $Result->affectedRows;
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            echo $error->getTraceAsString() . PHP_EOL;
+        });
+    }
+
+    public function query(string $sql, array $params = []): PromiseInterface
+    {
+        return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) use ($sql) {
+            switch (substr($sql, 0, 6)) {
+                case 'SELECT':
+                    return new Collection($Result->rows ?? []);
+                    break;
+                case 'INSERT':
+                    if ($Result->affectedRows === 1) {
+                        return $Result->insertId;
+                    }
+                case 'UPDATE':
+                case 'DELETE':
+                    return $Result->affectedRows;
+                    break;
+            }
+        }, function (\Exception $error) {
+            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
+            echo $error->getTraceAsString() . PHP_EOL;
+        });
     }
 }

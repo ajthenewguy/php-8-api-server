@@ -3,6 +3,7 @@
 namespace Tests\Unit\Database\Drivers;
 
 use Ajthenewguy\Php8ApiServer\Database\Drivers\Driver;
+use Ajthenewguy\Php8ApiServer\Database\Drivers\Sqlite;
 use Tests\TestCase;
 
 final class DriverTest extends TestCase
@@ -11,13 +12,12 @@ final class DriverTest extends TestCase
 
     public function testCreate()
     {
-        $PDO = Driver::create((object) [
+        $db = Driver::create((object) [
             'driver' => 'sqlite',
             'path' => $this->getDatabaseFile()->getPath()
         ]);
 
-        // $this->assertInstanceOf(\PDO::class, $PDO);
-        $this->assertEquals(\PDO::class, get_debug_type($PDO));
+        $this->assertEquals(Sqlite::class, get_debug_type($db));
     }
 
     protected function tearDown(): void

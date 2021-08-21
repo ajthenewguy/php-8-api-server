@@ -3,11 +3,13 @@
 namespace Ajthenewguy\Php8ApiServer\Routing;
 
 use Ajthenewguy\Php8ApiServer\Collection;
-use Ajthenewguy\Php8ApiServer\Exceptions\Http\NotFoundError;
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\MethodNotAllowedError;
+use Ajthenewguy\Php8ApiServer\Exceptions\Http\NotFoundError;
+use Ajthenewguy\Php8ApiServer\Http\Request;
 use Ajthenewguy\Php8ApiServer\Str;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
+use React\Promise;
 
 class Route
 {
@@ -15,13 +17,27 @@ class Route
 
     private Collection $Parameters;
 
+    private static array $globalMiddleware;
+
     public function __construct(
         private string $method,
         private string $uri,
         private $action,
-        private ?Guard $Guard = null
+        private ?Guard $Guard = null,
+        private array $middleware = []
     )
     {}
+
+    public static function middleware(array $globalMiddleware = [])
+    {
+        static::$globalMiddleware = $globalMiddleware;
+    }
+
+    public static function group(callable $group)
+    {
+        $group();
+        unset(static::$globalMiddleware);
+    }
 
     public static function delete(string $uri, callable|array $action, ?Guard $Guard = null)
     {
@@ -95,10 +111,11 @@ class Route
         return static::$Table;
     }
 
-    public function dispatch(ServerRequestInterface $request, array $parameters): Response
+    public function dispatch(ServerRequestInterface $request, array $parameters): Promise\PromiseInterface
     {
         $action = $this->getAction();
         $response = null;
+        $request = new Request($request);
         array_unshift($parameters, $request);
 
         if (is_array($action)) {
@@ -109,15 +126,19 @@ class Route
 
         if ($response !== null) {
             if ($response instanceof Response) {
-                return $response;
+                return Promise\resolve($response);
+            } elseif ($response instanceof Promise\Promise) {
+                return $response->then(function (Response $response) {
+                    return $response;
+                });
             }
             if (strlen($response) > 0) {
-                return new Response(200, ['Content-Type' => 'application/json'], $response);
+                return Promise\resolve(new Response(200, ['Content-Type' => 'application/json'], $response));
             }
-            return new Response(204, ['Content-Type' => 'application/json'], $response);
+            return Promise\resolve(new Response(204, ['Content-Type' => 'application/json'], $response));
         }
 
-        return new Response(404, ['Content-Type' => 'application/json'], 'Not found');
+        return Promise\resolve(new Response(404, ['Content-Type' => 'application/json'], 'Not found'));
     }
 
     public function getAction(): array|callable
@@ -138,6 +159,11 @@ class Route
     public function getMethod(): string
     {
         return $this->method;
+    }
+
+    public function getMiddleware(): array
+    {
+        return $this->middleware;
     }
 
     public function getParameter(string $name): ?RouteParameter
@@ -281,7 +307,8 @@ class Route
 
         $method = strtoupper($method);
         $id = $method . ':' . $uri;
+        $middleware = static::$globalMiddleware ?? [];
 
-        static::$Table->set($id, new static($method, $uri, $action, $Guard));
+        static::$Table->set($id, new static($method, $uri, $action, $Guard, $middleware));
     }
 }

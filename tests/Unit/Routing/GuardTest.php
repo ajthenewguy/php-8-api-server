@@ -9,30 +9,38 @@ class GuardTest extends TestCase
 {
     public function testValidate()
     {
-        //validate
         $Guard = new Guard(['user_id' => ['required']]);
 
         $claims = new \stdClass();
         $claims->exp = time() - 1000;
         $claims->user_id = 17;
 
-        $this->assertFalse($Guard->validate($claims));
+        $Guard->validate($claims)->then(function ($result) {
+            $this->assertFalse($result);
+        });
+        
 
         $claims = new \stdClass();
         $claims->exp = time() + 5;
 
-        $this->assertFalse($Guard->validate($claims));
+        $Guard->validate($claims)->then(function ($result) {
+            $this->assertFalse($result);
+        });
 
         $claims = new \stdClass();
         $claims->exp = time() + 5;
         $claims->user_id = null;
 
-        $this->assertFalse($Guard->validate($claims));
+        $Guard->validate($claims)->then(function ($result) {
+            $this->assertFalse($result);
+        });
 
         $claims = new \stdClass();
         $claims->exp = time() + 50;
         $claims->user_id = 17;
 
-        $this->assertTrue($Guard->validate($claims));
+        $Guard->validate($claims)->then(function ($result) {
+            $this->assertTrue($result);
+        });
     }
 }
