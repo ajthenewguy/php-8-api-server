@@ -8,16 +8,8 @@ trait RequiresServiceContainer
 {
     protected static Application $app;
 
-    public static function app(Application $app = null)
+    public static function app()
     {
-        if (isset($app)) {
-            static::$app = $app;
-        }
-
-        if (isset(static::$app)) {
-            return self::$app;
-        }
-
-        return null;
+        return Application::singleton();
     }
 }

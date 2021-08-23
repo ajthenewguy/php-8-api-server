@@ -524,10 +524,10 @@ class Str
         return $output;
     }
 
-    public static function random($seed, $length = 0)
+    public static function random($seed, $length = 10)
     {
         $string = '';
-        if (is_string($seed) && ! is_numeric($string)) {
+        if (is_string($seed) && ! is_numeric($seed)) {
             $string = (new static($seed))->randomize($length);
         } elseif (is_numeric($seed) && $seed > 0) {
             $string = (new static())->randomize($seed);

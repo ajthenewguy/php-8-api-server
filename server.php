@@ -4,18 +4,24 @@
 require __DIR__ . '/vendor/autoload.php';
 
 use Ajthenewguy\Php8ApiServer\Application;
-use Ajthenewguy\Php8ApiServer\Http\Middleware;
+use React\EventLoop\Loop;
 
-$Application = Application::singleton(Dotenv\Dotenv::createImmutable(__DIR__));
+$Application = Application::singleton(Dotenv\Dotenv::createImmutable(__DIR__), isset($argv[1]));
 
-require __DIR__ . '/config/middleware.php';
-require __DIR__ . '/config/routes.php';
+define('ROOT_PATH', __DIR__);
+define('SERVER_SCRIPT', __FILE__);
+define('SCRIPT_NAME', $argv[0]);
+define('CONFIG_PATH', $Application->getConfigDirectoryPath());
+
+require CONFIG_PATH . '/middleware.php';
+require CONFIG_PATH . '/routes.php';
 
 if (isset($argv[1])) {
-    require __DIR__ . '/config/commands.php';
+    require CONFIG_PATH . '/commands.php';
     
     $arguments = array_slice($argv, 2);
-    $Application->runCommand($argv[1], ...$arguments);
+    $Application->runCommand($argv[1], $arguments)->done();
+
 } else {
     $http = new React\Http\HttpServer(
         ...$Application->handleRequest()
@@ -23,4 +29,8 @@ if (isset($argv[1])) {
     $socket = new React\Socket\SocketServer($_ENV['APP_URL']);
 
     $http->listen($socket);
+
+    Loop::addTimer(0.75, function () {
+        echo '[ok] Listening on ' . $_ENV['APP_URL'] . PHP_EOL;
+    });
 }

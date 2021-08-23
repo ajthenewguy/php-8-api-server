@@ -15,5 +15,8 @@
   </testsuites>
   <php>
     <env name="APP_ENV" value="testing"/>
+    <const name="ROOT_PATH" value="./"/>
+    <const name="SCRIPT_NAME" value="phpunit"/>
+    <const name="CONFIG_PATH" value="./config"/>
   </php>
 </phpunit>

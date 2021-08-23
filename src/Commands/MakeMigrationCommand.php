@@ -4,10 +4,11 @@ namespace Ajthenewguy\Php8ApiServer\Commands;
 
 use Ajthenewguy\Php8ApiServer\Filesystem\File;
 use Ajthenewguy\Php8ApiServer\Str;
+use React\Promise\PromiseInterface;
 
 final class MakeMigrationCommand extends Command
 {
-    public function run()
+    public function run(): PromiseInterface
     {
         $args = func_get_args();
         $app = array_shift($args);
@@ -35,7 +36,7 @@ final class MakeMigrationCommand extends Command
 
             $filename = 'Migration_' . date('Y_m_d_') . $filename . '.php';
             $destination = dirname(dirname(__DIR__)) . '/migrations/';
-            $stdio->write('Wrting: ' . $filename . ' to ' . $destination . PHP_EOL);
+            $stdio->write('Writing: ' . $filename . ' to ' . $destination . PHP_EOL);
 
             $Migration = new File($destination . $filename);
 
@@ -49,17 +50,18 @@ final class MakeMigrationCommand extends Command
 
 use Ajthenewguy\Php8ApiServer\Database\Migration;
 use Ajthenewguy\Php8ApiServer\Database\Query;
+use React\Promise\PromiseInterface;
 
 class $className extends Migration
 {
-    public function up()
+    public function up(): PromiseInterface
     {
-        Query::driver()->exec("");
+        return Query::driver()->exec("");
     }
 
-    public function down()
+    public function down(): PromiseInterface
     {
-        Query::driver()->exec("");
+        return Query::driver()->exec("");
     }
 }
 
@@ -70,8 +72,9 @@ EOT;
                 $stdio->write('Error writing ' . $Migration->getPath() . PHP_EOL);
             }
 
-            $stdio->end();
-            return;
+            $stdio->close();
         });
+
+        return \React\Promise\resolve(null);
     }
 }

@@ -101,6 +101,11 @@ class Driver
         throw new \Exception('Not implemented.');
     }
 
+    public function exec(string $sql): PromiseInterface
+    {
+        return $this->query($sql);
+    }
+
     public function first(string $sql, array $params = []): PromiseInterface
     {
         throw new \Exception('Not implemented.');

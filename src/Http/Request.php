@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Http;
 
+use Ajthenewguy\Php8ApiServer\Repositories\UserRepository;
+use Ajthenewguy\Php8ApiServer\Services\AuthService;
 use Ajthenewguy\Php8ApiServer\Traits\MagicProxy;
 use Ajthenewguy\Php8ApiServer\Validation\Validator;
 use Psr\Http\Message\ServerRequestInterface;
@@ -81,12 +83,19 @@ class Request
         return $this->POST;
     }
 
+    public function user(): PromiseInterface
+    {
+        $claims = AuthService::getClaims($this->httpRequest());
+        $Repo = new UserRepository();
+        return $Repo->getById($claims->user_id);
+    }
+
     public function validate(array $rules, array $messages = []): PromiseInterface
     {
-        $POST = $this->post();
+        $input = $this->input();
 
         $Validator = new Validator($rules, $messages);
 
-        return $Validator->validate($POST);
+        return $Validator->validate($input);
     }
 }

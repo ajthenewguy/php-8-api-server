@@ -4,6 +4,7 @@ namespace Ajthenewguy\Php8ApiServer\Repositories;
 
 use Ajthenewguy\Php8ApiServer\Models\User;
 use Ajthenewguy\Php8ApiServer\Services\AuthService;
+use Ajthenewguy\Php8ApiServer\Str;
 use React\Promise;
 
 class UserRepository
@@ -13,6 +14,16 @@ class UserRepository
         return User::find($id);
     }
 
+    public function getForLogin(string $value, string $field = 'email'): Promise\PromiseInterface
+    {
+        return User::where($field, $value)->first();
+    }
+
+    public function getForVerification(string $value, string $field = 'verification_code'): Promise\PromiseInterface
+    {
+        return User::where($field, $value)->first();
+    }
+
     public function create(array $attributes): Promise\PromiseInterface
     {
         if (!isset($attributes['password'])) {
@@ -20,6 +31,7 @@ class UserRepository
         }
 
         $attributes['password'] = AuthService::hash($attributes['password']);
+        $attributes['verification_code'] = substr(uniqid(), mt_rand(0, 5), 7);
 
         return User::create($attributes);
     }

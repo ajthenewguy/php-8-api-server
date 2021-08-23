@@ -15,6 +15,11 @@ class DB {
         return self::app()->instance(Driver::class);
     }
 
+    public static function quit()
+    {
+        return self::app()->instance(Driver::class)->quit();
+    }
+
     public static function __callStatic($name, $arguments)
     {
         return call_user_func_array([Query::class, $name], $arguments);

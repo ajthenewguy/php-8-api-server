@@ -7,6 +7,24 @@ use Firebase\JWT\JWT as FirebaseJWT;
 
 class Jwt
 {
+    public \stdClass $claims;
+
+    public function __construct(array $claims = [], int $lifetimeMinutes = 900)
+    {
+        $this->claims = new \stdClass();
+        $this->claims->exp = time() + (60 * $lifetimeMinutes);
+        $this->claims->iat = time();
+
+        foreach ($claims as $key => $value) {
+            $this->claims->$key = $value;
+        }
+    }
+
+    public function __toString(): string
+    {
+        return Jwt::createToken($this->claims);
+    }
+
     public static function createToken(\stdClass|array $payload): string
     {
         $key = static::getPrivateKey();

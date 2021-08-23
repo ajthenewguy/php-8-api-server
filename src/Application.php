@@ -2,18 +2,22 @@
 
 namespace Ajthenewguy\Php8ApiServer;
 
-use Ajthenewguy\Php8ApiServer\Config\Json;
+use Ajthenewguy\Php8ApiServer\Config;
 use Ajthenewguy\Php8ApiServer\Database\Drivers\Driver as DatabaseDriver;
 use Ajthenewguy\Php8ApiServer\Database\Query;
+use Ajthenewguy\Php8ApiServer\Exceptions\ConfigurationException;
 use Ajthenewguy\Php8ApiServer\Exceptions\FileNotFoundException;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
-use Ajthenewguy\Php8ApiServer\Filesystem\File;
+use Ajthenewguy\Php8ApiServer\Filesystem;
 use Ajthenewguy\Php8ApiServer\Http\Middleware\Middleware;
 use Ajthenewguy\Php8ApiServer\Reporting\Logger;
 use Ajthenewguy\Php8ApiServer\Traits\HasConfig;
 use Ajthenewguy\Php8ApiServer\Traits\RequiresBinary;
 use Ajthenewguy\Php8ApiServer\Traits\SystemInterface;
+use Clue\React\Stdio\Stdio;
 use Psr\Http\Message\ServerRequestInterface;
+use React\EventLoop\Loop;
+use React\Promise;
 
 class Application
 {
@@ -29,19 +33,22 @@ class Application
 
     protected array $providers;
 
-    protected function __construct(\Dotenv\Dotenv $dotenv = null)
+    protected bool $inCommand = false;
+
+    protected function __construct(\Dotenv\Dotenv $dotenv = null, bool $inCommand)
     {
         if ($dotenv) {
             $dotenv->load();
         }
 
+        $this->inCommand = $inCommand;
         $this->configure();
     }
 
-    public static function singleton(?\Dotenv\Dotenv $dotenv = null): static
+    public static function singleton(?\Dotenv\Dotenv $dotenv = null, bool $inCommand = false): static
     {
         if (!isset(static::$instance)) {
-            static::$instance = new static($dotenv);
+            static::$instance = new static($dotenv, $inCommand);
         }
 
         return static::$instance;
@@ -87,6 +94,52 @@ class Application
         }
 
         $this->providers[$class] = $provider;
+    }
+
+    public function getConfigDirectoryPath(): string
+    {
+        return is_dir($_ENV['CONFIG_PATH'] ?? '') ? $_ENV['CONFIG_PATH'] : ROOT_PATH . '/config';
+    }
+
+    public function getMigrationsDirectoryPath(): string
+    {
+        return is_dir($_ENV['CONFIG_PATH'] ?? '') ? $_ENV['CONFIG_PATH'] : ROOT_PATH . '/migrations';
+    }
+
+    public function getPublicDirectoryPath(): string
+    {
+        return is_dir($_ENV['CONFIG_PATH'] ?? '') ? $_ENV['CONFIG_PATH'] : ROOT_PATH . '/public';
+    }
+
+    public function getPendingDatabaseMigrations(): Promise\PromiseInterface
+    {
+        $MigrationsDirectory = new Filesystem\Directory($this->getMigrationsDirectoryPath(ROOT_PATH));
+        $migrationFiles = $MigrationsDirectory->files();
+        $names = array_map(function (Filesystem\File $Migration) {
+            return Str::rprune($Migration->getFilename(), '.php');
+        }, $migrationFiles);
+
+        return Query::table('migrations')->whereIn('migration', $names)->get()->then(
+            function ($Migrations) use ($migrationFiles) {
+                $toBeRun = [];
+                if ($Migrations) {
+                    $alreadyRun = [];
+                    
+                    if (!$Migrations->empty()) {
+                        $alreadyRun = $Migrations->column('migration')->toArray();
+                    }
+
+                    foreach ($migrationFiles as $Migration) {
+                        $migrationName = Str::rprune($Migration->getFilename(), '.php');
+                        if (!in_array($migrationName, $alreadyRun)) {
+                            $toBeRun[$migrationName] = $Migration;
+                        }
+                    }
+                    
+                    return $toBeRun;
+                }
+            }
+        );
     }
 
     /**
@@ -172,7 +225,7 @@ class Application
     /**
      * Run a command.
      */
-    public function runCommand(string $name, array $arguments = [])
+    public function runCommand(string $name, array $arguments = []): Promise\PromiseInterface
     {
         if (!$this->hasCommand($name)) {
             throw new \InvalidArgumentException(sprintf('Command "%s" does not exist.', $name));
@@ -190,7 +243,7 @@ class Application
     {
         if (isset($_ENV['APP_CONFIG'])) {
             $path = $_ENV['APP_CONFIG'];
-            $File = new File($path);
+            $File = new Filesystem\File($path);
 
             if (!$File->exists()) {
                 throw new FileNotFoundException($path);
@@ -198,19 +251,54 @@ class Application
 
             switch ($File->extension) {
                 case 'json':
-                    $this->setConfig(new Json($path));
+                    $this->setConfig(new Config\Json($path));
+                    break;
+                case 'php':
+                    $this->setConfig(include($path));
                     break;
                 default:
-                    $this->setConfig(include($path));
+                    throw new ConfigurationException(sprintf("'%s': unsupported configuration file format.", $path));
                     break;
             }
         } else {
             $this->setConfig();
         }
 
-        $this->configureSecurityKeys();
-        $this->configureDatabase();
         $this->configureLogging();
+        $this->configureSecurityKeys();
+        $this->configureDatabase()->then(function ($databaseInitialized) {
+            $MigrationsDirectory = new Filesystem\Directory($this->getMigrationsDirectoryPath(ROOT_PATH));
+
+            if ($databaseInitialized && !$MigrationsDirectory->empty()) {
+                Log::info(sprintf('[ok] Database initialized - ready to run database migrations (%s db:migrate)', SCRIPT_NAME));
+            } elseif ($databaseInitialized === false) {
+                if (!$this->inCommand) {
+                    $this->getPendingDatabaseMigrations()->then(function ($toBeRun) {
+                        if (count($toBeRun) > 0) {
+                            $FileList = array_map(function (Filesystem\File $File) {
+                                return $File->filename;
+                            }, $toBeRun);
+                            Log::warning(sprintf("[warning] Found %d pending database migrations:\n\t - %s\n", count($toBeRun), implode("\n\t - ", $FileList)));
+                            Log::info(sprintf("[info] run '%s db:migrate' before starting server.\n", SCRIPT_NAME));
+                            // $stdio = new Stdio(Loop::get());
+                            // $stdio->write(sprintf('[warning] Found %d pending database migrations (run %s db:migrate)', count($toBeRun), SCRIPT_NAME));
+                            // $stdio->setPrompt('Would you like to run them now? [y/N] > ');
+
+                            // $stdio->on('data', function ($line) use ($stdio) {
+                            //     $line = rtrim($line, "\r\n");
+                            //     // $stdio->write('Your input: ' . $line . PHP_EOL);
+                            //     if (strlen($line) > 0 && strtoupper($line[0]) === 'Y') {
+                            //         $Command = new Commands\DbMigrateCommand();
+                            //         $Command->run($this)->done();
+                            //     }
+                            // });
+                        }
+                    })->done();
+                }
+            }
+        }, function (\Throwable $e) {
+            echo $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL;
+        })->done();
 
         // Set the token lifetime
         if (isset($_ENV['APP_TOKEN_LIFETIME_MINS']) && !empty($_ENV['APP_TOKEN_LIFETIME_MINS'])) {
@@ -218,12 +306,14 @@ class Application
         } else {
             $this->config()->set('security.tokenLifetime', 15);
         }
+
+        $this->configureEmail();
     }
 
     /**
      * Scan configuration and ENV vars for database configuration information.
      */
-    protected function configureDatabase(): bool
+    protected function configureDatabase(): Promise\PromiseInterface
     {
         $configuration = (array) $this->config()->get('database');
         $env = function ($key, $default = null) {
@@ -275,23 +365,48 @@ class Application
 
             if (!empty($configuration)) {
                 $this->bindInstance(DatabaseDriver::class, DatabaseDriver::create($configuration));
-                Query::app($this);
+                // Query::app($this);
 
-                try {
-                    $this->db()->exec('SELECT 1 FROM migrations');
-                } catch (\Throwable $e) {
+                return $this->db()->query('SELECT 1 FROM migrations')->then(function () {
+                    return false;
+                }, function (\Throwable $e) {
+                    echo $e->getMessage() . PHP_EOL;
                     $this->db()->exec('CREATE TABLE IF NOT EXISTS migrations (
                         id INTEGER PRIMARY KEY,
                         migration VARCHAR (128) NOT NULL,
                         batch INTEGER NOT NULL DEFAULT 1
-                    )');
-                }
-
-                return true;
+                    )')->done();
+                    return true;
+                });
             }
         }
 
-        return false;
+        return Promise\resolve(null);
+    }
+
+    public function configureEmail()
+    {
+        $env = function ($key, $default = null) {
+            $value = $default;
+            if (isset($_ENV[$key])) {
+                $value = $_ENV[$key];
+                if ($value === '') {
+                    $value = $default;
+                }
+            }
+
+            return $value;
+        };
+
+        if (isset($_ENV['MAIL_HOST'])) {
+            $this->config()->set('mail.host', $env('MAIL_HOST', 'localhost'));
+            $this->config()->set('mail.port', $env('MAIL_PORT', 25));
+            $this->config()->set('mail.encryption', $env('MAIL_ENCRYPTION'));
+            $this->config()->set('mail.username', $env('MAIL_USERNAME'));
+            $this->config()->set('mail.password', $env('MAIL_PASSWORD'));
+            $this->config()->set('mail.from.name', $env('MAIL_FROM_NAME'));
+            $this->config()->set('mail.from.email', $env('MAIL_FROM_EMAIL'));
+        }
     }
 
     /**
@@ -304,7 +419,7 @@ class Application
             return Logger::create($configuration);
         });
 
-        Log::app($this);
+        // Log::app($this);
     }
 
     protected function configureSecurityKeys()
@@ -327,13 +442,6 @@ class Application
 
         if (isset($_ENV['APP_KEY_ALGORITHM']) && !empty($_ENV['APP_KEY_ALGORITHM'])) {
             $this->config()->set('security.keyAlgorithm', $_ENV['APP_KEY_ALGORITHM']);
-        }
-    }
-
-    public function close()
-    {
-        if ($this->db()) {
-            $this->db()->quit();
         }
     }
 }

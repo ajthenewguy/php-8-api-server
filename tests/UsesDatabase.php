@@ -4,7 +4,6 @@ namespace Tests;
 
 use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Database\Drivers\Driver;
-use Ajthenewguy\Php8ApiServer\Database\Query;
 use Ajthenewguy\Php8ApiServer\Filesystem\File;
 
 trait UsesDatabase
@@ -29,7 +28,6 @@ trait UsesDatabase
         $this->tearDownDatabase();
 
         $this->app->bindInstance(Driver::class, Driver::create(['driver' => 'sqlite', 'path' => $this->getDatabaseFile()->getPath()]));
-        // Query::app($this->app);
         $this->db = $this->app->instance(Driver::class);
 
         return $this->db;

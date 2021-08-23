@@ -352,10 +352,16 @@ class Query
         // return $this->exe($this->compileQuery());
     }
 
-    public function value(string $column)
+    public function value(string $column): PromiseInterface
     {
-        $first = $this->first();
-        return property_exists($first, $column) ? $first->$column : null;
+        return $this->first()->then(function ($first) use ($column) {
+            if (is_array($first)) {
+                return array_key_exists($column, $first) ? $first[$column] : null;
+            } elseif (is_object($column)) {
+                return property_exists($first, $column) ? $first->$column : null;
+            }
+            return null;
+        });
     }
 
     public function limit(int $limit): self

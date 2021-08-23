@@ -3,12 +3,14 @@
 namespace Ajthenewguy\Php8ApiServer\Commands;
 
 use Ajthenewguy\Php8ApiServer\Database\Query;
-use Ajthenewguy\Php8ApiServer\Filesystem\File;
+use Ajthenewguy\Php8ApiServer\Facades\DB;
 use Ajthenewguy\Php8ApiServer\Filesystem\Directory;
+use Ajthenewguy\Php8ApiServer\Filesystem\File;
+use React\Promise\PromiseInterface;
 
 final class DbRollbackCommand extends Command
 {
-    public function run()
+    public function run(): PromiseInterface
     {
         $args = func_get_args();
         $app = array_shift($args);
@@ -22,78 +24,73 @@ final class DbRollbackCommand extends Command
             throw new \Exception('Database not configured.');
         }
 
-        $stdio = $this->stdio();
-        try {
-            Query::transaction(function () use ($stdio, $batches) {
-                $MigrationsDirectory = new Directory(dirname(dirname(__DIR__)) . '/migrations');
-                $Migrations = Query::table('migrations')->orderBy('batch', 'desc')->get();
+        return Query::table('migrations')->orderBy('batch', 'desc')->get()->then(function ($Migrations) use ($batches) {
+            $MigrationsDirectory = new Directory(dirname(dirname(__DIR__)) . '/migrations');
+            
+            if ($Migrations->empty()) {
+                $this->stdio()->write('Nothing to roll back.' . PHP_EOL);
+            }
 
-                if ($Migrations->empty()) {
-                    $stdio->write('Nothing to roll back.' . PHP_EOL);
+            $batchStop = -1;
+            foreach ($Migrations as $migration) {
+                $batch = intval($migration['batch']);
+
+                if ($batches > 0 && $batchStop < 0) {
+                    $batchStop = max($batch - $batches, 0);
                 }
 
-                $batchStop = -1;
-                foreach ($Migrations as $Migration) {
-                    $batch = intval($Migration->batch);
+                if ($batch <= $batchStop) {
+                    break;
+                }
 
-                    if ($batches > 0 && $batchStop < 0) {
-                        $batchStop = max($batch - $batches, 0);
-                    }
+                $filename = $migration['migration'] . '.php';
+                $MigrationFile = new File($MigrationsDirectory->path($filename));
 
-                    if ($batch <= $batchStop) {
-                        break;
-                    }
+                if (!$MigrationFile->exists()) {
+                    $this->stdio()->write('Error: file for migration ' . $migration['migration'] . ' not found.' . PHP_EOL);
+                    return;
+                }
 
-                    $filename = $Migration->migration . '.php';
-                    $MigrationFile = new File($MigrationsDirectory->path($filename));
+                $this->stdio()->write('Rolling back ' . $MigrationFile->getFilename() . '...' . PHP_EOL);
 
-                    if (!$MigrationFile->exists()) {
-                        $stdio->write('Error: file for migration ' . $Migration->migration . ' not found.' . PHP_EOL);
-                        $stdio->end();
-                        return;
-                    }
+                require $MigrationFile->getPath();
 
-                    $stdio->write('Rolling back ' . $MigrationFile->getFilename() . '...' . PHP_EOL);
+                $fp = fopen($MigrationFile->getPath(), 'r');
+                $class = $buffer = '';
+                $i = 0;
+                while (!$class) {
+                    if (feof($fp)) break;
 
-                    require $MigrationFile->getPath();
+                    $buffer .= fread($fp, 512);
+                    $tokens = token_get_all($buffer);
 
-                    $fp = fopen($MigrationFile->getPath(), 'r');
-                    $class = $buffer = '';
-                    $i = 0;
-                    while (!$class) {
-                        if (feof($fp)) break;
+                    if (strpos($buffer, '{') === false) continue;
 
-                        $buffer .= fread($fp, 512);
-                        $tokens = token_get_all($buffer);
-
-                        if (strpos($buffer, '{') === false) continue;
-
-                        for (; $i < count($tokens); $i++) {
-                            if ($tokens[$i][0] === T_CLASS) {
-                                for ($j = $i + 1; $j < count($tokens); $j++) {
-                                    if ($tokens[$j] === '{') {
-                                        $class = $tokens[$i + 2][1];
-                                    }
+                    for (; $i < count($tokens); $i++) {
+                        if ($tokens[$i][0] === T_CLASS) {
+                            for ($j = $i + 1; $j < count($tokens); $j++) {
+                                if ($tokens[$j] === '{') {
+                                    $class = $tokens[$i + 2][1];
                                 }
                             }
                         }
                     }
-
-                    $class = '\\' . $class;
-
-                    $MigrationClass = new $class;
-                    $MigrationClass->down();
-
-                    Query::table('migrations')->where('id', $Migration->id)->delete();
-
-                    $stdio->write('Rolled back ' . $MigrationFile->getFilename() . '.' . PHP_EOL);
                 }
-            });
-        } catch (\Throwable $e) {
-            $stdio->write('Migration error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL);
-        }
 
-        $stdio->end();
-        return;
+                $class = '\\' . $class;
+
+                $MigrationClass = new $class;
+                $MigrationClass->down();
+
+                Query::table('migrations')->where('id', $migration['id'])->delete()->then(function ($result) use ($MigrationFile) {
+                    if ($result) {
+                        $this->stdio()->write('Rolled back ' . $MigrationFile->getFilename() . '.' . PHP_EOL);
+                    }
+                })->done();
+            }
+        })->then(function () {
+            $this->stdio()->end();
+            DB::quit();
+        }); 
     }
 }

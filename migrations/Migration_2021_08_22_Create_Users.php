@@ -2,12 +2,13 @@
 
 use Ajthenewguy\Php8ApiServer\Database\Migration;
 use Ajthenewguy\Php8ApiServer\Database\Query;
+use React\Promise\PromiseInterface;
 
-class Migration_2021_08_19_Create_Users extends Migration
+class Migration_2021_08_22_Create_Users extends Migration
 {
-    public function up()
+    public function up(): PromiseInterface
     {
-        Query::driver()->exec("CREATE TABLE IF NOT EXISTS users (
+        return Query::driver()->exec("CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
             email VARCHAR (255),
             password VARCHAR (255),
@@ -21,8 +22,8 @@ class Migration_2021_08_19_Create_Users extends Migration
         )");
     }
 
-    public function down()
+    public function down(): PromiseInterface
     {
-        Query::driver()->exec("DROP TABLE IF EXISTS users");
+        return Query::driver()->exec("DROP TABLE IF EXISTS users");
     }
 }

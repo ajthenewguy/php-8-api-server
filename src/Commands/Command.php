@@ -4,17 +4,23 @@ namespace Ajthenewguy\Php8ApiServer\Commands;
 
 use Clue\React\Stdio\Stdio;
 use React\EventLoop\Loop;
+use React\Promise\PromiseInterface;
 
 abstract class Command
 {
-    abstract public function run();
+    private Stdio $stdio;
+
+    abstract public function run(): PromiseInterface;
 
     /**
      * Get a input/output instance.
      */
     protected function stdio()
     {
-        return new Stdio(Loop::get());
+        if (!isset($this->stdio)) {
+            $this->stdio = new Stdio(Loop::get());
+        }
+        return $this->stdio;
     }
     
     /**

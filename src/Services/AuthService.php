@@ -2,6 +2,7 @@
 
 namespace Ajthenewguy\Php8ApiServer\Services;
 
+use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Auth\Jwt;
 use Ajthenewguy\Php8ApiServer\Models\User;
 use Psr\Http\Message\ServerRequestInterface;
@@ -25,6 +26,13 @@ class AuthService
     public static function hash(string $data): string
     {
         return password_hash($data, PASSWORD_DEFAULT);
+    }
+
+    public static function createToken(User $User, int $lifetimeMinutes = null)
+    {
+        $lifetimeMinutes ??= (int) Application::singleton()->config()->get('security.tokenLifetime') ?? 15;
+
+        return new Jwt(['user_id' => $User->id], $lifetimeMinutes);
     }
 
     /**

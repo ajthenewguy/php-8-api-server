@@ -44,9 +44,6 @@ class Mysql extends Driver {
     {
         return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
             return $Result->resultRows[0]['COUNT(*)'] ?? 0;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -54,9 +51,6 @@ class Mysql extends Driver {
     {
         return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
             return $Result->affectedRows;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -64,9 +58,6 @@ class Mysql extends Driver {
     {
         return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
             return $Result->resultRows[0] ?? null;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -74,9 +65,6 @@ class Mysql extends Driver {
     {
         return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
             return new Collection($Result->resultRows ?? []);
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -87,9 +75,6 @@ class Mysql extends Driver {
                 return $Result->insertId;
             }
             return $Result->affectedRows;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -97,9 +82,6 @@ class Mysql extends Driver {
     {
         return $this->proxied->query($sql, $params)->then(function (QueryResult $Result) {
             return $Result->affectedRows;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -119,9 +101,6 @@ class Mysql extends Driver {
                     return $Result->affectedRows;
                     break;
             }
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 }

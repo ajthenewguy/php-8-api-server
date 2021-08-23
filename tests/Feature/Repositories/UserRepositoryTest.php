@@ -52,6 +52,26 @@ class UserRepositoryTest extends TestCase
         $loop->run();
     }
 
+    public function testGetForLogin()
+    {
+        $loop = Loop::get();
+
+        $Repo = new UserRepository();
+        Query::table('users')->insert([
+            'email' => 'someemail@web.com',
+            'name_first' => 'Bob',
+            'name_last' => 'Williams'
+        ])->then(function ($id) use ($Repo) {
+            $Repo->getForLogin('someemail@web.com')->then(function ($User) use ($id) {
+                $this->assertEquals($id, $User->id);
+
+                $this->db->quit();
+            })->done();
+        })->done();
+
+        $loop->run();
+    }
+
     public function testCreate()
     {
         $loop = Loop::get();

@@ -47,9 +47,6 @@ class Sqlite extends Driver
     {
         return $this->proxied->query($sql, $params)->then(function (Result $Result) {
             return $Result->rows[0]['COUNT(*)'] ?? 0;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -57,9 +54,6 @@ class Sqlite extends Driver
     {
         return $this->proxied->query($sql, $params)->then(function (Result $Result) {
             return $Result->changed;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -77,9 +71,6 @@ class Sqlite extends Driver
     {
         return $this->proxied->query($sql, $params)->then(function (Result $Result) {
             return new Collection($Result->rows ?? []);
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -90,9 +81,6 @@ class Sqlite extends Driver
                 return $Result->insertId;
             }
             return $Result->changed;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -100,9 +88,6 @@ class Sqlite extends Driver
     {
         return $this->proxied->query($sql, $params)->then(function (Result $Result) {
             return $Result->changed;
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 
@@ -122,9 +107,6 @@ class Sqlite extends Driver
                     return $Result->changed;
                     break;
             }
-        }, function (\Exception $error) {
-            echo "\n" . 'Error: ' . $error->getMessage() . ' in ' . $error->getFile() . ':' . $error->getLine() . PHP_EOL;
-            echo $error->getTraceAsString() . PHP_EOL;
         });
     }
 }
