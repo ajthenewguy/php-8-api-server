@@ -8,4 +8,8 @@ class User extends Model
 
     protected array $dates = ['verified_at'];
 
+    public static function generateVerificationCode(): string
+    {
+        return substr(uniqid(), mt_rand(0, 5), 7);
+    }
 }

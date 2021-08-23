@@ -2,7 +2,6 @@
 
 namespace Ajthenewguy\Php8ApiServer\Http\Controllers\Auth;
 
-use Ajthenewguy\Php8ApiServer\Facades\DB;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Http\Controllers\Controller;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
@@ -20,7 +19,6 @@ class RegisterController extends Controller
 
         return $request->validate([
             'email' => ['required', 'email', 'not-exists:users,email'],
-            'password' => ['required', 'string'],
             'name_first' => ['required', 'string'],
             'name_last' => ['required', 'string']
         ], [
@@ -34,11 +32,33 @@ class RegisterController extends Controller
             $Repo = new UserRepository();
 
             return $Repo->create($data)->then(function ($User) {
-                return JsonResponse::make(['data' => [
-                    'type' => 'User',
-                    'id' => $User->id,
-                    'verification_code' => $User->verification_code
-                ]], 201);
+
+                // @todo - Move to separate Controller/endpoint? Perhaps the client app should request an email be sent
+                $Email = Email::make(
+                    'Welcome New User',
+                    'Please verify your account here: ' . $_ENV['APP_URL'] . '/auth/verify?code=' . $User->verification_code,
+                    'allenmccabe@gmail.com',
+                    'API Team'
+                )->to($User->email, $User->name_first . ' ' . $User->name_last);
+
+                return $Email->save()->then(function ($Email) use ($User) {
+                    $process = new \React\ChildProcess\Process('php ' . SERVER_SCRIPT . ' mail:send ' . $Email->id, ROOT_PATH);
+                    $process->start();
+                    
+                    $process->stdout->on('data', function ($chunk) {
+                        Log::info($chunk);
+                    });
+
+                    $process->on('exit', function ($exitCode, $termSignal) {
+                        if ($exitCode) Log::error('Process exited with code ' . $exitCode);
+                    });
+
+                    return JsonResponse::make(['data' => [
+                        'type' => 'User',
+                        'id' => $User->id,
+                        'verification_code' => $User->verification_code
+                    ]], 201);
+                });
             });
         });
     }

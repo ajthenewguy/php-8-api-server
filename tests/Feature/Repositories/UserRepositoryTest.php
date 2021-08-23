@@ -34,13 +34,12 @@ class UserRepositoryTest extends TestCase
     {
         $loop = Loop::get();
 
-        $Repo = new UserRepository();
         Query::table('users')->insert([
             'email' => 'someemail@web.com',
             'name_first' => 'Bob',
             'name_last' => 'Williams'
-        ])->then(function ($id) use ($Repo) {
-            $Repo->getById($id)->then(function ($User) {
+        ])->then(function ($id) {
+            UserRepository::getById($id)->then(function ($User) {
                 $email = (string) $User->email ?? '';
             
                 $this->assertEquals('someemail@web.com', $email);
@@ -56,13 +55,12 @@ class UserRepositoryTest extends TestCase
     {
         $loop = Loop::get();
 
-        $Repo = new UserRepository();
         Query::table('users')->insert([
             'email' => 'someemail@web.com',
             'name_first' => 'Bob',
             'name_last' => 'Williams'
-        ])->then(function ($id) use ($Repo) {
-            $Repo->getForLogin('someemail@web.com')->then(function ($User) use ($id) {
+        ])->then(function ($id) {
+            UserRepository::getForLogin('someemail@web.com')->then(function ($User) use ($id) {
                 $this->assertEquals($id, $User->id);
 
                 $this->db->quit();
@@ -76,8 +74,7 @@ class UserRepositoryTest extends TestCase
     {
         $loop = Loop::get();
 
-        $Repo = new UserRepository();
-        $Repo->create([
+        UserRepository::create([
             'email' => 'someemail@web.com',
             'password' => '123',
             'name_first' => 'Bob',
@@ -98,17 +95,16 @@ class UserRepositoryTest extends TestCase
     public function testUpdate()
     {
         $loop = Loop::get();
-        $Repo = new UserRepository();
 
         Query::table('users')->insert([
             'email' => 'someemail@web.com',
             'name_first' => 'Bob',
             'name_last' => 'Williams'
-        ])->then(function ($id) use ($Repo) {
-            $Repo->getById($id)->then(function ($User) use ($Repo) {
+        ])->then(function ($id) {
+            UserRepository::getById($id)->then(function ($User) {
                 $this->assertEquals('someemail@web.com', $User->email);
 
-                $Repo->update($User, ['email' => 'anotheremail@web.com'])->then(function ($User) {
+                UserRepository::update($User, ['email' => 'anotheremail@web.com'])->then(function ($User) {
                     $this->assertEquals('anotheremail@web.com', $User->email);
                     $this->db->quit();
                 })->done();
@@ -122,16 +118,14 @@ class UserRepositoryTest extends TestCase
     {
         $loop = Loop::get();
 
-        $Repo = new UserRepository();
-
         Query::table('users')->insert([
             'email' => 'someemail@web.com',
             'name_first' => 'Bob',
             'name_last' => 'Williams'
-        ])->then(function ($id) use ($Repo) {
-            $Repo->getById($id)->then(function ($User) use ($Repo) {
+        ])->then(function ($id) {
+            UserRepository::getById($id)->then(function ($User) {
                 $this->assertTrue($User->exists());
-                $Repo->delete($User->id)->then(function ($result) {
+                UserRepository::delete($User->id)->then(function ($result) {
                     $this->assertTrue($result);
                     $this->db->quit();
                 })->done();

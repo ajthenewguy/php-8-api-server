@@ -27,9 +27,7 @@ class LoginController extends Controller
                 return JsonResponse::make(['errors' => $errors], 422);
             }
 
-            $Repo = new UserRepository();
-
-            return $Repo->getForLogin($data['email'])->then(function ($User) use ($data) {
+            return UserRepository::getForLogin($data['email'])->then(function ($User) use ($data) {
                 if (AuthService::authenticate($User, $data['password'])) {
                     if ($User->verified_at) {
                         $token = AuthService::createToken($User);

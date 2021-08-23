@@ -86,8 +86,8 @@ class Request
     public function user(): PromiseInterface
     {
         $claims = AuthService::getClaims($this->httpRequest());
-        $Repo = new UserRepository();
-        return $Repo->getById($claims->user_id);
+
+        return UserRepository::getById($claims->user_id);
     }
 
     public function validate(array $rules, array $messages = []): PromiseInterface

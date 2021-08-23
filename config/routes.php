@@ -37,8 +37,9 @@ Route::get('/ping', function (Request $request) {
 });
 
 Route::post('/auth/register', new Controllers\Auth\RegisterController());
-Route::post('/auth/login', new Controllers\Auth\LoginController());
+Route::post('/auth/reset', new Controllers\Auth\ResetController());
 Route::post('/auth/verify', new Controllers\Auth\VerifyController());
+Route::post('/auth/login', new Controllers\Auth\LoginController());
 
 /**
  * Define application API guarded routes below.

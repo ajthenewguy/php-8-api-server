@@ -17,7 +17,10 @@ class VerifyController extends Controller
         }
 
         $validated = $request->validate([
-            'verification_code' => ['required', 'exists:users,verification_code']
+            'verification_code' => ['required', 'exists:users,verification_code'],
+            'password' => ['required', 'string', 'regex:/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{12,}$/']
+        ], [
+            'password.regex' => 'Password must at least 12 characters and include a number.'
         ]);
 
         return $validated->then(function ($validation) {
@@ -26,14 +29,13 @@ class VerifyController extends Controller
                 return JsonResponse::make(['errors' => $errors], 401);
             }
 
-            $Repo = new UserRepository();
-
-            return $Repo->getForVerification($data['verification_code'])->then(function ($User) use ($Repo) {
+            return UserRepository::getForVerification($data['verification_code'])->then(function ($User) use ($data) {
                 if ($User->verified_at === null) {
                     $attributes = [
+                        'password' => $data['password'],
                         'verified_at' => new \DateTime()
                     ];
-                    return $Repo->update($User, $attributes)->then(function ($User) {
+                    return UserRepository::update($User, $attributes)->then(function ($User) {
                         $token = AuthService::createToken($User);
 
                         return JsonResponse::make([
