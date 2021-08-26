@@ -10,7 +10,7 @@ class Migration_2021_08_22_Create_Users extends Migration
     {
         return Query::driver()->exec("CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
-            email VARCHAR (255),
+            email VARCHAR (255) NOT NULL UNIQUE,
             password VARCHAR (255),
             verification_code VARCHAR (255),
             verified_at TIMESTAMP,

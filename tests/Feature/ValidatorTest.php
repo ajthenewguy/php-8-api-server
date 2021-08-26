@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use Ajthenewguy\Php8ApiServer\Collection;
-use Ajthenewguy\Php8ApiServer\Exceptions\ValidationException;
 use Ajthenewguy\Php8ApiServer\Facades\DB;
 use Ajthenewguy\Php8ApiServer\Validation\Validator;
 use React\EventLoop\Loop;
@@ -33,17 +31,6 @@ final class ValidatorTest extends TestCase
                 'name' => ['Name is required'],
                 'date' => ['The "date" field format is invalid.']
             ];
-            // print "\n".__METHOD__.':'.__LINE__."\n";
-            // var_dump($result);
-
-            // array(2) [
-            //     [0]=> array(0) [ ]
-            //     [1]=> array(1) [
-            //         ["name"]=> array(1) [
-            //             [0]=> string(16) "Name is required"
-            //         ]
-            //     ]
-            // ]
             $this->assertEquals($expected, $result[1]);
         })->done();
 

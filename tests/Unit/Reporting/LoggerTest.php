@@ -7,7 +7,7 @@ use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Filesystem\Directory;
 use Ajthenewguy\Php8ApiServer\Reporting\Logger;
 use Ajthenewguy\Php8ApiServer\Reporting\Drivers\StandardLogger;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class LoggerTest extends TestCase
 {

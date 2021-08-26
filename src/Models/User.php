@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Models;
 
+use Ajthenewguy\Php8ApiServer\Str;
+
 class User extends Model
 {
     protected static string $table = 'users';
@@ -10,6 +12,6 @@ class User extends Model
 
     public static function generateVerificationCode(): string
     {
-        return substr(uniqid(), mt_rand(0, 5), 7);
+        return Str::simpleRandom(12);
     }
 }

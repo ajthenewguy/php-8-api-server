@@ -1,9 +1,10 @@
 <?php declare(strict_types=1);
 
 use Ajthenewguy\Php8ApiServer\Arr;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
-class ArrTest extends TestCase {
+class ArrTest extends TestCase
+{
 
     public function testFromObject()
     {

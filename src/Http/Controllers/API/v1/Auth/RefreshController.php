@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Ajthenewguy\Php8ApiServer\Http\Controllers\Auth;
+namespace Ajthenewguy\Php8ApiServer\Http\Controllers\API\v1\Auth;
 
 use Ajthenewguy\Php8ApiServer\Http\Controllers\Controller;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;

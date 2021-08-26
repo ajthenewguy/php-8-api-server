@@ -18,12 +18,11 @@ class AuthorizationMiddleware extends Middleware
 {
     public function __invoke(ServerRequestInterface $request, callable $next)
     {
-        // print "\n". __CLASS__ . "\n";
+        // print __METHOD__ . ':' . __LINE__ . PHP_EOL;
         // Log::debug($request); // React\Http\Message\ServerRequest
         try {
             $claims = AuthService::getClaims($request);
-            $Repo = new UserRepository();
-            if ($User = $Repo->getById($claims->user_id)) {
+            if ($User = UserRepository::getById($claims->user_id)) {
                 if ($User->email === 'allenmccabe@gmail.com') {
                     return $next($request);
                 }

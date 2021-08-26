@@ -2,10 +2,10 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
 use Ajthenewguy\Php8ApiServer\Application;
-use Ajthenewguy\Php8ApiServer\Reporting\Logger;
 use Ajthenewguy\Php8ApiServer\Reporting\Drivers\NullLogger;
+use Ajthenewguy\Php8ApiServer\Reporting\Logger;
+use Tests\TestCase;
 
 final class ApplicationTest extends TestCase
 {

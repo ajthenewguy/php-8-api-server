@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" bootstrap="vendor/autoload.php" backupGlobals="false" colors="true" convertErrorsToExceptions="true" convertNoticesToExceptions="true" convertWarningsToExceptions="true" processIsolation="false" stopOnFailure="false" verbose="true" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.0/phpunit.xsd" cacheDirectory=".phpunit.cache" backupStaticProperties="false">
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" bootstrap="bootstrap.php" backupGlobals="false" colors="true" convertErrorsToExceptions="true" convertNoticesToExceptions="true" convertWarningsToExceptions="true" processIsolation="false" stopOnFailure="false" verbose="true" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.0/phpunit.xsd" cacheDirectory=".phpunit.cache" backupStaticProperties="false">
   <coverage>
     <include>
       <directory suffix=".php">./src</directory>
@@ -15,8 +15,6 @@
   </testsuites>
   <php>
     <env name="APP_ENV" value="testing"/>
-    <const name="ROOT_PATH" value="./"/>
-    <const name="SCRIPT_NAME" value="phpunit"/>
-    <const name="CONFIG_PATH" value="./config"/>
+    <env name="SCRIPT_NAME" value="test"/>
   </php>
 </phpunit>

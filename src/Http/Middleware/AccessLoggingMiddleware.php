@@ -4,13 +4,13 @@ namespace Ajthenewguy\Php8ApiServer\Http\Middleware;
 
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
+use Ajthenewguy\Php8ApiServer\Http\Request;
 use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use React\Promise;
 
 class AccessLoggingMiddleware extends Middleware
 {
-    public function __invoke(ServerRequestInterface $request, callable $next)
+    public function __invoke(Request $request, callable $next)
     {
         $promise = Promise\resolve($next($request));
         return $promise->then(function (ResponseInterface $response) use ($request) {
@@ -23,11 +23,11 @@ class AccessLoggingMiddleware extends Middleware
             $responseCode = $response->getStatusCode();
             $responseBytes = $response->getBody()->getSize();
             
-            Log::info(sprintf('%s - - [%s] "%s %s %s" %d %d', $remoteAddr, $requestTime, $requestMethod, $requestTarget, $protocol, $responseCode, $responseBytes));
+            Log::info(sprintf('%s - - [%s] "%s %s %s" %d %d -', $remoteAddr, $requestTime, $requestMethod, $requestTarget, $protocol, $responseCode, $responseBytes));
 
             return $response;
 
-        }, function (\Exception $e) {
+        }, function (\Throwable $e) {
             Log::error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
 
             return JsonResponse::make($e->getMessage(), 500);

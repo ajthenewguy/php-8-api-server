@@ -3,6 +3,7 @@
 namespace Ajthenewguy\Php8ApiServer\Http;
 
 use Ajthenewguy\Php8ApiServer\Application;
+use Ajthenewguy\Php8ApiServer\Str;
 use Psr\Http\Message\StreamInterface;
 use React\Http\Message\Response as ReactResponse;
 use React\Stream\ReadableStreamInterface;
@@ -21,6 +22,19 @@ class Response
         $headers = (array) $headers;
         $headers = array_merge((array) $App->config()->get('response-headers'), $headers);
 
+        if (!isset($headers['Content-Type'])) {
+            $headers['Content-Type'] = 'text/html';
+        }
+
         return new ReactResponse($status, $headers, $body, $version, $reason);
+    }
+
+    public static function redirect(string $location, int $statusCode = 302)
+    {
+        if (!Str::startsWith($location, 'http://') && !Str::startsWith($location, 'https://')) {
+            $location = sprintf('%s/%s', $_ENV['SERVER_URL'], ltrim($location, '/'));
+        }
+
+        return new ReactResponse($statusCode, ['Location' => $location]);
     }
 }

@@ -2,8 +2,8 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
 use Ajthenewguy\Php8ApiServer\Collection;
+use Tests\TestCase;
 
 final class CollectionTest extends TestCase
 {

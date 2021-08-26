@@ -1,0 +1,14 @@
+#!/usr/bin/env php
+<?php declare(strict_types=1);
+
+define('SCRIPT_NAME', $argv[0]);
+
+require __DIR__ . '/bootstrap.php';
+require CONFIG_PATH . '/commands.php';
+
+$arguments = array_slice($argv, 2);
+if (isset($argv[1]) && !in_array($argv[1], ['-h', '--help'])) {
+    Ajthenewguy\Php8ApiServer\Application::runCommand($argv[1], $arguments)->done();
+} else {
+    Ajthenewguy\Php8ApiServer\Application::commandHelp();
+}

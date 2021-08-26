@@ -1,0 +1,21 @@
+@charset "utf-8";
+@import "../../node_modules/bulma/bulma.sass";
+
+nav.navbar {
+    border-top: 4px solid #276cda;
+    margin-bottom: 1rem;
+}
+
+html, body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.columns:last-of-type {
+    margin-bottom: 10px;
+}
+
+body > footer {
+    margin-top: auto;
+}

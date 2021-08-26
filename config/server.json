@@ -1,4 +1,7 @@
 {
+    "cache": {
+        "path": "cache"
+    },
     "database": {
         "driver": "sqlite",
         "path": "data/test.sqlite"
@@ -7,6 +10,11 @@
         "driver": "standard"
     },
     "response-headers": {
-        "Content-Type": "application/vnd.api+json"
+    },
+    "static-files": {
+        "path": "public"
+    },
+    "views": {
+        "path": "resources/views"
     }
 }

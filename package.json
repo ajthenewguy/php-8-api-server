@@ -1,0 +1,32 @@
+{
+  "name": "php8-api-server",
+  "version": "0.0.1",
+  "description": "API Server front-end.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "css-build": "node-sass --omit-source-map-url resources/sass/main.scss public/css/main.css",
+    "css-watch": "npm run css-build -- --watch",
+    "start": "npm run css-watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajthenewguy/php-8-api-server.git"
+  },
+  "author": "Allen McCabe",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ajthenewguy/php-8-api-server/issues"
+  },
+  "homepage": "https://github.com/ajthenewguy/php-8-api-server#readme",
+  "dependencies": {
+    "bulma-start": "^0.0.4"
+  },
+  "devDependencies": {
+    "bulma": "^0.9.3",
+    "node-sass": "^6.0.1"
+  }
+}

@@ -2,6 +2,7 @@
 
 namespace Ajthenewguy\Php8ApiServer;
 
+use Ajthenewguy\Php8ApiServer\Attr\ConfigAttribute;
 use Ajthenewguy\Php8ApiServer\Config;
 use Ajthenewguy\Php8ApiServer\Database\Drivers\Driver as DatabaseDriver;
 use Ajthenewguy\Php8ApiServer\Database\Query;
@@ -10,18 +11,20 @@ use Ajthenewguy\Php8ApiServer\Exceptions\FileNotFoundException;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Filesystem;
 use Ajthenewguy\Php8ApiServer\Http\Middleware\Middleware;
+use Ajthenewguy\Php8ApiServer\Http\Request;
 use Ajthenewguy\Php8ApiServer\Reporting\Logger;
 use Ajthenewguy\Php8ApiServer\Traits\HasConfig;
 use Ajthenewguy\Php8ApiServer\Traits\RequiresBinary;
 use Ajthenewguy\Php8ApiServer\Traits\SystemInterface;
-use Clue\React\Stdio\Stdio;
 use Psr\Http\Message\ServerRequestInterface;
-use React\EventLoop\Loop;
+use React\Cache\ArrayCache;
 use React\Promise;
 
 class Application
 {
     use HasConfig, RequiresBinary, SystemInterface;
+
+    public Request $Request;
 
     protected static Application $instance;
 
@@ -35,20 +38,16 @@ class Application
 
     protected bool $inCommand = false;
 
-    protected function __construct(\Dotenv\Dotenv $dotenv = null, bool $inCommand)
+    protected function __construct(bool $inCommand)
     {
-        if ($dotenv) {
-            $dotenv->load();
-        }
-
         $this->inCommand = $inCommand;
         $this->configure();
     }
 
-    public static function singleton(?\Dotenv\Dotenv $dotenv = null, bool $inCommand = false): static
+    public static function singleton(bool $inCommand = false): static
     {
         if (!isset(static::$instance)) {
-            static::$instance = new static($dotenv, $inCommand);
+            static::$instance = new static($inCommand);
         }
 
         return static::$instance;
@@ -75,6 +74,11 @@ class Application
         }
 
         $this->instances[$class] = $instance;
+    }
+
+    public function cache()
+    {
+        return $this->instance(Cache::class) ?? null;
     }
 
     public function db()
@@ -150,7 +154,30 @@ class Application
         $Middleware = new Collection(null, Middleware::class);
         
         $this->Middlewares->each(function ($middleware) use ($Middleware) {
-            $Middleware->push(new $middleware());
+            $arguments = [];
+
+            $reflectionClass = new \ReflectionClass($middleware);
+            $methods = $reflectionClass->getMethods();
+            $constructors = array_filter($methods, function ($method) {
+                return $method->name === '__construct';
+            });
+
+            if (isset($constructors[0])) {
+                if ($parameters = $constructors[0]->getParameters()) {
+                    if (isset($parameters[0])) {
+                        if ($attributes = $parameters[0]->getAttributes()) {
+                            foreach ($attributes as $Attribute) {
+                                if ($Attribute->getName() === ConfigAttribute::class) {
+                                    [$key, $default] = $Attribute->getArguments();
+                                    $arguments[] = $this->config()->get($key) ?? $default;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            $Middleware->push(new $middleware(...$arguments));
         });
         
         return $Middleware->toArray();
@@ -225,15 +252,34 @@ class Application
     /**
      * Run a command.
      */
-    public function runCommand(string $name, array $arguments = []): Promise\PromiseInterface
+    public static function runCommand(string $name, array $arguments = []): Promise\PromiseInterface
     {
-        if (!$this->hasCommand($name)) {
+        $Application = static::singleton(true);
+        if (!$Application->hasCommand($name)) {
             throw new \InvalidArgumentException(sprintf('Command "%s" does not exist.', $name));
         }
 
         $callback = static::$commands[$name];
 
-        return $callback($this, ...$arguments);
+        return $callback($Application, ...$arguments);
+    }
+
+    public static function commandHelp()
+    {
+        echo 'Available commands:' . PHP_EOL;
+        foreach (static::$commands as $name => $command) {
+            echo "\t" . $name;
+            if (isset($command->title)) {
+                echo $command->title . PHP_EOL;
+            }
+            if (isset($command->description)) {
+                echo ' - ' . $command->description . PHP_EOL;
+            }
+            echo PHP_EOL;
+
+            // @todo - Command can return arguments
+        }
+        static::singleton(true)->db()->quit();
     }
 
     /**
@@ -264,6 +310,7 @@ class Application
             $this->setConfig();
         }
 
+        $this->configureCache();
         $this->configureLogging();
         $this->configureSecurityKeys();
         $this->configureDatabase()->then(function ($databaseInitialized) {
@@ -308,6 +355,11 @@ class Application
         }
 
         $this->configureEmail();
+    }
+
+    protected function configureCache()
+    {
+        $this->bindInstance(Cache::class, new ArrayCache());
     }
 
     /**

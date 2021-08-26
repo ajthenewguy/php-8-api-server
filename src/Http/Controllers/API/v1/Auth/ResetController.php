@@ -1,12 +1,14 @@
 <?php declare(strict_types=1);
 
-namespace Ajthenewguy\Php8ApiServer\Http\Controllers\Auth;
+namespace Ajthenewguy\Php8ApiServer\Http\Controllers\API\v1\Auth;
 
+use Ajthenewguy\Php8ApiServer\Auth\Jwt;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Http\Controllers\Controller;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
 use Ajthenewguy\Php8ApiServer\Http\Request;
 use Ajthenewguy\Php8ApiServer\Models\Email;
+use Ajthenewguy\Php8ApiServer\Models\PasswordResetToken;
 use Ajthenewguy\Php8ApiServer\Models\User;
 use Ajthenewguy\Php8ApiServer\Repositories\UserRepository;
 
@@ -29,10 +31,19 @@ class ResetController extends Controller
             }
 
             return UserRepository::getForLogin($data['email'])->then(function ($User) {
-                $attributes = [
-                    'verification_code' => User::generateVerificationCode()
-                ];
-                return UserRepository::update($User, $attributes)->then(function ($User) {
+                // $attributes = [
+                //     'verification_code' => User::generateVerificationCode(),
+                //     // 'verified_at' => null  // ?
+                // ];
+                $token = new Jwt(['user_id' => $User->id], 5);
+                $Token = new PasswordResetToken([
+                    'user_id' => $User->id,
+                    'token' => (string) $token,
+                    'token_expiry' => $token->claims->exp
+                ]);
+
+                return $Token->save()->then(function ($User) {
+                    Log::info(sprintf('Issued password reset token for User id: %d', $User->id));
 
                     // // @todo - Move to separate Controller/endpoint? Perhaps the client app should request an email be sent
                     // $Email = Email::make(

@@ -8,8 +8,6 @@ use Ajthenewguy\Php8ApiServer\Filesystem\File;
 
 trait UsesDatabase
 {
-    public Application $app;
-
     public $database;
 
     public $db;
@@ -21,14 +19,10 @@ trait UsesDatabase
 
     protected function setUpDatabase(): Driver
     {
-        if (!isset($this->app)) {
-            $this->app = Application::singleton();
-        }
-
         $this->tearDownDatabase();
 
-        $this->app->bindInstance(Driver::class, Driver::create(['driver' => 'sqlite', 'path' => $this->getDatabaseFile()->getPath()]));
-        $this->db = $this->app->instance(Driver::class);
+        static::app()->bindInstance(Driver::class, Driver::create(['driver' => 'sqlite', 'path' => $this->getDatabaseFile()->getPath()]));
+        $this->db = static::app()->instance(Driver::class);
 
         return $this->db;
     }

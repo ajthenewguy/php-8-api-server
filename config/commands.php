@@ -9,10 +9,11 @@ use Ajthenewguy\Php8ApiServer\Commands;
  * Core application CLI commands.
  */
 
-Application::singleton()->bindCommand('make:migration', new Commands\MakeMigrationCommand());
-Application::singleton()->bindCommand('db:migrate', new Commands\DbMigrateCommand());
-Application::singleton()->bindCommand('db:rollback', new Commands\DbRollbackCommand());
-Application::singleton()->bindCommand('mail:send', new Commands\SendMailCommand());
+$Application = Application::singleton(true);
+$Application->bindCommand('make:migration', new Commands\MakeMigrationCommand());
+$Application->bindCommand('db:migrate', new Commands\DbMigrateCommand());
+$Application->bindCommand('db:rollback', new Commands\DbRollbackCommand());
+$Application->bindCommand('mail:send', new Commands\SendMailCommand());
 
 /**
  * Register additional application CLI commands below.

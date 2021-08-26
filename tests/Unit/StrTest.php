@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 use Ajthenewguy\Php8ApiServer\Str;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class StrTest extends TestCase {
 

@@ -3,7 +3,7 @@
 namespace Tests\Unit\Routing;
 
 use Ajthenewguy\Php8ApiServer\Routing\Guard;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class GuardTest extends TestCase
 {

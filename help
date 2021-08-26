@@ -1,0 +1,7 @@
+#!/bin/bash
+
+echo "API Server command line interface."
+echo "Usage ./cli' for CLI commands."
+echo
+echo "API Server"
+echo "Run '> ./server.php' to start the API server."

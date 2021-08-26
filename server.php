@@ -1,36 +1,32 @@
 #!/usr/bin/env php
 <?php declare(strict_types=1);
 
-require __DIR__ . '/vendor/autoload.php';
+define('SCRIPT_NAME', $argv[0]);
+
+require __DIR__ . '/bootstrap.php';
 
 use Ajthenewguy\Php8ApiServer\Application;
+use Ajthenewguy\Php8ApiServer\Facades\Log;
 use React\EventLoop\Loop;
-
-$Application = Application::singleton(Dotenv\Dotenv::createImmutable(__DIR__), isset($argv[1]));
-
-define('ROOT_PATH', __DIR__);
-define('SERVER_SCRIPT', __FILE__);
-define('SCRIPT_NAME', $argv[0]);
-define('CONFIG_PATH', $Application->getConfigDirectoryPath());
 
 require CONFIG_PATH . '/middleware.php';
 require CONFIG_PATH . '/routes.php';
 
-if (isset($argv[1])) {
-    require CONFIG_PATH . '/commands.php';
-    
-    $arguments = array_slice($argv, 2);
-    $Application->runCommand($argv[1], $arguments)->done();
+$http = new React\Http\HttpServer(
+    ...Application::singleton()->handleRequest()
+);
+// $http = new React\Http\HttpServer(
+//     new Ajthenewguy\Php8ApiServer\Http\Controllers\HomeController(),
+// );
 
-} else {
-    $http = new React\Http\HttpServer(
-        ...$Application->handleRequest()
-    );
-    $socket = new React\Socket\SocketServer($_ENV['APP_URL']);
+$socket = new React\Socket\SocketServer($_ENV['SERVER_HOST'] . ':' . $_ENV['SERVER_PORT']);
 
-    $http->listen($socket);
+$http->on('error', function (Throwable $e) {
+    Log::error($e->getMessage());
+    Log::error($e->getFile() . ':' . $e->getLine());
+});
+$http->listen($socket);
 
-    Loop::addTimer(0.75, function () {
-        echo '[ok] Listening on ' . $_ENV['APP_URL'] . PHP_EOL;
-    });
-}
+Loop::addTimer(0.75, function () {
+    Log::info('[ok] Listening on ' . $_ENV['SERVER_HOST'] . ':' . $_ENV['SERVER_PORT']);
+});

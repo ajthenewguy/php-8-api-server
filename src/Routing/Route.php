@@ -2,11 +2,13 @@
 
 namespace Ajthenewguy\Php8ApiServer\Routing;
 
+use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Collection;
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\MethodNotAllowedError;
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\NotFoundError;
 use Ajthenewguy\Php8ApiServer\Http\Request;
 use Ajthenewguy\Php8ApiServer\Str;
+use Illuminate\Contracts\View\View;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
 use React\Promise;
@@ -111,26 +113,34 @@ class Route
         return static::$Table;
     }
 
-    public function dispatch(ServerRequestInterface $request, array $parameters): Promise\PromiseInterface
+    public function dispatch(Request $request, array $parameters): Promise\PromiseInterface
     {
         $action = $this->getAction();
         $response = null;
-        $request = new Request($request);
         array_unshift($parameters, $request);
 
         if (is_array($action)) {
-            $response = call_user_func_array($action, ...$parameters);
+            $Controller = $action[0];
+            $Controller = new $Controller();
+            $response = call_user_func_array([$Controller, $action[1]], $parameters);
         } elseif (is_callable($action)) {
             $response = $action(...$parameters);
         }
 
+        Application::singleton()->Request = $request;
+
         if ($response !== null) {
             if ($response instanceof Response) {
                 return Promise\resolve($response);
-            } elseif ($response instanceof Promise\Promise) {
-                return $response->then(function (Response $response) {
+            } elseif ($response instanceof Promise\PromiseInterface) {
+                return $response->then(function ($response) {
+                    if ($response instanceof View) {
+                        return Promise\resolve(new Response(200, [], $response->render()));
+                    }
                     return $response;
                 });
+            } elseif ($response instanceof View) {
+                return Promise\resolve(new Response(200, [], $response->render()));
             }
             if (strlen($response) > 0) {
                 return Promise\resolve(new Response(200, ['Content-Type' => 'application/json'], $response));

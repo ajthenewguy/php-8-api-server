@@ -7,7 +7,7 @@ use Ajthenewguy\Php8ApiServer\Exceptions\Http\MethodNotAllowedError;
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\NotFoundError;
 use Ajthenewguy\Php8ApiServer\Routing\Route;
 use Ajthenewguy\Php8ApiServer\Routing\RouteParameter;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class RouteTest extends TestCase
 {

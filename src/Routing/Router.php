@@ -13,12 +13,8 @@ class Router
         $response = new Response(404, ['Content-Type' => 'application/json'], 'Not found');
 
         try {
-            $serverParams = $request->getServerParams();
-            $remoteAddr = $serverParams['REMOTE_ADDR'];
-            $requestTime = date('d/M/Y:H:i:s O');
             $requestMethod = $request->getMethod();
             $requestTarget = $request->getRequestTarget();
-            $protocol = 'HTTP/' . $request->getProtocolVersion();
 
             if ($Route = Route::lookup($requestMethod, $requestTarget)) {
                 $parameters = [];
@@ -36,14 +32,11 @@ class Router
                         }
                     }
                 }
-                
-                $response = $Route->dispatch($request, $parameters);
+
+                return $Route->dispatch($request, $parameters);
             }
 
-            $responseCode = $response->getStatusCode();
-            $responseBytes = $response->getBody()->getSize();
-
-            Log::info(sprintf('%s - - [%s] "%s %s %s" %d %d', $remoteAddr, $requestTime, $requestMethod, $requestTarget, $protocol, $responseCode, $responseBytes));
+            
         } catch (\Throwable $e) {
             Log::error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
         }

@@ -15,12 +15,49 @@ trait MagicProxy
 
     public function __call($name, $args)
     {
-        return call_user_func_array([$this->proxied, $name], $args);
+        if (isset($this->proxied)) {
+            return call_user_func_array([$this->proxied, $name], $args);
+        }
+        return null;
     }
 
     public static function __callStatic($name, $args)
     {
-        return call_user_func_array([static::$proxiedClass, $name], $args);
+        if (isset(static::$proxiedClass)) {
+            return call_user_func_array([static::$proxiedClass, $name], $args);
+        }
+        return null;
+    }
+
+    public function get(string $name, $default = null)
+    {
+        if (isset($this->$name)) {
+            return $this->$name;
+        }
+
+        return $default;
+    }
+
+    public function push(string $name, array ...$values): self
+    {
+        $contents = $this->get($name) ?? [];
+
+        if (!is_array($contents)) {
+            throw new \InvalidArgumentException('Unable to push a value onto a non-array member.');
+        }
+
+        foreach ($values as $value) {
+            $contents[$name][] = $value;
+        }
+
+        $this->set($name, $contents);
+
+        return $this;
+    }
+
+    public function set(string $name, $value)
+    {
+        $this->$name = $value;
     }
 
     public function __get($name)
@@ -35,11 +72,7 @@ trait MagicProxy
             return call_user_func([$this, $method]);
         }
 
-        if (isset($this->$name)) {
-            return $this->$name;
-        }
-
-        return null;
+        return $this->get($name);
     }
 
     public function __isset($name): bool
@@ -49,6 +82,6 @@ trait MagicProxy
 
     public function __set(string $name, $value) 
     {
-        $this->$name = $value;
+        $this->set($name, $value);
     }
 }

@@ -5,7 +5,7 @@ namespace Tests\Unit;
 use Ajthenewguy\Php8ApiServer\Filesystem\Directory;
 use Ajthenewguy\Php8ApiServer\Reporting\Logger;
 use Ajthenewguy\Php8ApiServer\Reporting\Drivers\FileLogger;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class FileLoggerTest extends TestCase
 {

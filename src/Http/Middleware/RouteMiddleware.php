@@ -21,26 +21,34 @@ class RouteMiddleware extends Middleware
             $requestMethod = $request->getMethod();
             $requestTarget = $request->getRequestTarget();
 
-            if ($Route = Route::lookup($requestMethod, $requestTarget)) {
-                $parameters = [];
+            try {
+                if ($Route = Route::lookup($requestMethod, $requestTarget)) {
+                    $parameters = [];
 
-                if ($Route->hasParams()) {
-                    $parameterKeys = $Route->getParameters()->map(function (RouteParameter $Parameter) {
-                        return $Parameter->getName();
-                    })->toArray();
+                    if ($Route->hasParams()) {
+                        $parameterKeys = $Route->getParameters()->map(function (RouteParameter $Parameter) {
+                            return $Parameter->getName();
+                        })->toArray();
 
-                    $parameters = $Route->pregMatch($requestTarget);
+                        $parameters = $Route->pregMatch($requestTarget);
 
-                    foreach ($parameterKeys as $name) {
-                        if (!array_key_exists($name, $parameters)) {
-                            $parameters[$name] = null;
+                        foreach ($parameterKeys as $name) {
+                            if (!array_key_exists($name, $parameters)) {
+                                $parameters[$name] = null;
+                            }
                         }
                     }
-                }
 
-                return $Route->dispatch($request, $parameters)->then(function (Response $response) {
-                    return $response;
-                });
+                    return $Route->dispatch($request, $parameters)->then(function (Response $response) {
+                        return $response;
+                    }, function (\Throwable $e) {
+                        Log::error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
+
+                        return JsonResponse::make($e->getMessage(), 500);
+                    });
+                }
+            } catch (\Exception|\Throwable $e) {
+                Log::error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
             }
         } catch (ServerError $e) {
             return JsonResponse::make($e->getMessage() . ' - RouteMiddleware', $e->getCode());

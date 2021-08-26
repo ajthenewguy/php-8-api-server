@@ -575,6 +575,16 @@ class Str
         return new Str($filename);
     }
 
+    public static function simpleRandom($length = 10)
+    {
+        $string = '';
+        while (strlen($string) < $length) {
+            $string .= uniqid();
+        }
+        
+        return substr($string, mt_rand(0, intval($length / 4)), $length);
+    }
+
     /**
      * @param $input
      * @return mixed
