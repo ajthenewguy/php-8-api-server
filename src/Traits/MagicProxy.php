@@ -55,6 +55,21 @@ trait MagicProxy
         return $this;
     }
 
+    public function pull(string $name, $default = null)
+    {
+        $value = $this->get($name, $default);
+        $this->remove($name);
+
+        return $value;
+    }
+
+    public function remove(string $name)
+    {
+        unset($this->$name);
+
+        return $this;
+    }
+
     public function set(string $name, $value)
     {
         $this->$name = $value;

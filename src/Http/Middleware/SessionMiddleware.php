@@ -11,17 +11,20 @@ class SessionMiddleware extends Middleware
     public function __invoke(ServerRequestInterface $request, callable $next)
     {
         $Cache = Application::singleton()->cache();
+        $lifetimeMinutes = Application::singleton()->config()->get('session.lifetime-minutes');
+        $expiresIn = $lifetimeMinutes * 60;
         $Middleware = new BaseMiddleware(
-            'CookieName',
+            'ApiServerSessionCookie',
             $Cache, // Instance implementing React\Cache\CacheInterface
             [ // Optional array with cookie settings, order matters
-                0, // expiresAt, int, default
+                $expiresIn, // expiresIn, int, default
                 '/', // path, string, default
                 '', // domain, string, default
                 false, // secure, bool, default
                 false // httpOnly, bool, default
             ],
         );
+
         return $Middleware($request, $next);
     }
 }

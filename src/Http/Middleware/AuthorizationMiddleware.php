@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Ajthenewguy\Php8ApiServer\Http\Middleware;
 
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\ServerError;
-use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
 use Ajthenewguy\Php8ApiServer\Repositories\UserRepository;
-use Ajthenewguy\Php8ApiServer\Routing\Route;
 use Ajthenewguy\Php8ApiServer\Services\AuthService;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\SignatureInvalidException;
@@ -18,8 +16,6 @@ class AuthorizationMiddleware extends Middleware
 {
     public function __invoke(ServerRequestInterface $request, callable $next)
     {
-        // print __METHOD__ . ':' . __LINE__ . PHP_EOL;
-        // Log::debug($request); // React\Http\Message\ServerRequest
         try {
             $claims = AuthService::getClaims($request);
             if ($User = UserRepository::getById($claims->user_id)) {

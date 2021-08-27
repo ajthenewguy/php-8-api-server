@@ -2,6 +2,7 @@
 
 namespace Ajthenewguy\Php8ApiServer\Http\Controllers\Auth;
 
+use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Facades\View;
 use Ajthenewguy\Php8ApiServer\Http\Controllers\Controller;
 use Ajthenewguy\Php8ApiServer\Http\Request;
@@ -19,20 +20,13 @@ class LoginController extends Controller
         return $request->user()->then(function ($User) {
             return Response::redirect(static::$redirectTo);
         }, function (\Exception $e) use ($request) {
-            $csrf = Str::simpleRandom(16);
-
-            $request->Session()->set('csrf', $csrf);
-
             return View::make('login');
         });
     }
 
     public function postForm(Request $request)
     {
-        $csrf = $request->getSession('csrf');
-
         return $request->validate([
-            'csrf' => ['required', 'equals:' . $csrf],
             'email' => ['required', 'email', 'exists:users,email'],
             'password' => ['required', 'string']
         ])->then(function ($validated) use ($request) {
@@ -47,7 +41,7 @@ class LoginController extends Controller
                         $request->Session()->set('user_id', $User->id);
                         $request->Session()->set('User', $User);
 
-                        return Response::redirect(static::$redirectTo);
+                        return $request->redirectToIntended(static::$redirectTo);
                     } else {
                         return $request->redirectBackWithErrors(['email' => ['User email unverified.']]);
                     }

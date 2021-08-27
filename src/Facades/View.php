@@ -14,6 +14,10 @@ class View
     {
         $Blade = new Blade(self::app()->config()->get('views.path'), self::app()->config()->get('cache.path'));
 
+        foreach (static::directives() as $name => $callable) {
+            $Blade->directive($name, $callable);
+        }
+
         return $Blade;
     }
 
@@ -25,5 +29,14 @@ class View
     public static function render(string $view, Contracts\Support\Arrayable|array $data = [], array $mergeData = []): string
     {
         return static::Blade()->render($view, $data, $mergeData);
+    }
+
+    protected static function directives(): array
+    {
+        return [
+            'csrf' => function () {
+                return "<?php echo '<input type=\"hidden\" name=\"_csrf\" value=\"' . Session()->token() . '\" />' ?>";
+            }
+        ];
     }
 }

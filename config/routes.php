@@ -36,11 +36,9 @@ Route::post('/account/recover', [Controllers\Account\RecoverController::class, '
  * Define application UI guarded routes below.
  */
 
-Route::get('/account', function (Request $request) {
-    return $request->user()->then(function ($User) {
-        return Response::make(sprintf("Welcome %s.\n", $User->name_first));
-    });
-}, new Guard());
+Route::get('/account', [Controllers\Account\ProfileController::class, 'index'], new Guard());
+Route::get('/account/profile', [Controllers\Account\ProfileController::class, 'getForm'], new Guard());
+Route::post('/account/profile', [Controllers\Account\ProfileController::class, 'postForm'], new Guard());
 
 
 

@@ -11,6 +11,9 @@
     },
     "response-headers": {
     },
+    "session": {
+        "lifetime-minutes": 15
+    },
     "static-files": {
         "path": "public"
     },

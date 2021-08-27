@@ -27,7 +27,7 @@
                 }
 
                 if (Session()->has('User')) {
-                    echo '<p class="navbar-item">' . Session()->get('User')->name_first . ' ' . Session()->get('User')->name_last . '</p>';
+                    echo '<a href="/account" class="navbar-item">' . Session()->get('User')->name_first . ' ' . Session()->get('User')->name_last . '</a>';
                     echo '<a href="/logout" class="navbar-item">Logout</a>';
                 }
             @endphp

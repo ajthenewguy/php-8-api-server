@@ -10,7 +10,9 @@ use Ajthenewguy\Php8ApiServer\Http\Middleware;
  */
 
 Application::singleton()->registerMiddleware('session', Middleware\SessionMiddleware::class);
+Application::singleton()->registerMiddleware('decorator', Middleware\RequestDecoratorMiddleware::class);
 Application::singleton()->registerMiddleware('static_file', Middleware\StaticResourceMiddleware::class);
+Application::singleton()->registerMiddleware('verify_csrf', Middleware\VerifyCsrfMiddleware::class);
 Application::singleton()->registerMiddleware('auth', Middleware\AuthenticationMiddleware::class);
 Application::singleton()->registerMiddleware('access_logging', Middleware\AccessLoggingMiddleware::class);
 Application::singleton()->registerMiddleware('dispatch', Middleware\RouteMiddleware::class);

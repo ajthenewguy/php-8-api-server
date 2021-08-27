@@ -9,7 +9,6 @@ use Ajthenewguy\Php8ApiServer\Exceptions\Http\NotFoundError;
 use Ajthenewguy\Php8ApiServer\Http\Request;
 use Ajthenewguy\Php8ApiServer\Str;
 use Illuminate\Contracts\View\View;
-use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
 use React\Promise;
 
@@ -72,7 +71,7 @@ class Route
             throw new MethodNotAllowedError($method, $url);
         }
 
-        $Matches = $Matches->sort(function (Route $RouteA, Route $RouteB) use ($url) {
+        return $Matches->sort(function (Route $RouteA, Route $RouteB) use ($url) {
             $compareA = Str::before($RouteA->getUri(), '{') ?: $RouteA->getUri();
             $compareB = Str::before($RouteB->getUri(), '{') ?: $RouteB->getUri();
             $levA = levenshtein($url, $compareA);
@@ -82,15 +81,7 @@ class Route
                 return 0;
             }
             return $levB > $levA ? -1 : 1;
-        });
-
-        if (!$Matches->empty()) {
-            
-        } else {
-            // throw new NotFoundError($url);
-        }
-
-        return $Matches->first();
+        })->first();
     }
 
     public static function patch(string $uri, callable|array $action, ?Guard $Guard = null)
@@ -113,11 +104,18 @@ class Route
         return static::$Table;
     }
 
-    public function dispatch(Request $request, array $parameters): Promise\PromiseInterface
+    public function dispatch(Request $request, array $parameters)
     {
         $action = $this->getAction();
         $response = null;
         array_unshift($parameters, $request);
+
+        // Set a CSRF token in the session
+        if (!$request->expectsJson() && !$request->Session()->token()) {
+            $request->Session()->token(Str::simpleRandom(16));
+        }
+
+        Application::singleton()->Request = $request;
 
         if (is_array($action)) {
             $Controller = $action[0];
@@ -127,24 +125,29 @@ class Route
             $response = $action(...$parameters);
         }
 
-        Application::singleton()->Request = $request;
-
         if ($response !== null) {
+
+            if (is_string($response)) {
+                $response = new Response(200, ['Content-Type' => 'text/html'], $response);
+            }
+
+            if ($response instanceof View) {
+                $response = new Response(200, ['Content-Type' => 'text/html'], $response->render());
+            }
+
             if ($response instanceof Response) {
-                return Promise\resolve($response);
-            } elseif ($response instanceof Promise\PromiseInterface) {
+                $response = Promise\resolve($response);
+            }
+            
+            if ($response instanceof Promise\PromiseInterface) {
                 return $response->then(function ($response) {
                     if ($response instanceof View) {
-                        return Promise\resolve(new Response(200, [], $response->render()));
+                        return new Response(200, ['Content-Type' => 'text/html'], $response->render());
                     }
                     return $response;
                 });
-            } elseif ($response instanceof View) {
-                return Promise\resolve(new Response(200, [], $response->render()));
             }
-            if (strlen($response) > 0) {
-                return Promise\resolve(new Response(200, ['Content-Type' => 'application/json'], $response));
-            }
+
             return Promise\resolve(new Response(204, ['Content-Type' => 'application/json'], $response));
         }
 

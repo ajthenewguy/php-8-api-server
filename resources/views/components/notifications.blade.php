@@ -9,4 +9,12 @@
         @endforeach
     @endforeach
 @endif
+@if(Session()->has('notifications'))
+    @foreach(Session()->get('notifications') as $notification)
+    <div class="notification is-{{ $notification['type'] }}">
+        <!-- <button class="delete"></button> -->
+        {!! $notification['message'] !!}
+    </div>
+    @endforeach
+@endif
 </div>

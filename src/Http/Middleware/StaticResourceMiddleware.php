@@ -6,7 +6,6 @@ use Ajthenewguy\Php8ApiServer\Attr\ConfigAttribute;
 use Ajthenewguy\Php8ApiServer\Http\Request;
 use Ajthenewguy\Php8ApiServer\Http\Response;
 use Ajthenewguy\Php8ApiServer\Str;
-use Psr\Http\Message\ServerRequestInterface;
 
 class StaticResourceMiddleware extends Middleware
 {
@@ -15,8 +14,8 @@ class StaticResourceMiddleware extends Middleware
         private string $path
     ) {}
 
-    public function __invoke(ServerRequestInterface $request, $next)
-    {   
+    public function __invoke(Request $request, $next)
+    {
         $rootPath = $this->path;
         $filePath = $request->getUri()->getPath();
 
@@ -47,8 +46,6 @@ class StaticResourceMiddleware extends Middleware
 
             return Response::make($fileContents, 200, ['Content-Type' => $fileType]);
         }
-        
-        $request = new Request($request);
         
 
         return $next($request);

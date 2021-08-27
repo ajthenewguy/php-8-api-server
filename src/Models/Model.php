@@ -18,6 +18,11 @@ class Model implements \JsonSerializable, \Serializable
 
     protected array $dates = [];
 
+    protected array $sensitive = [
+        'password',
+        'ssn'
+    ];
+
     protected ?bool $exists = null;
 
     protected static array $castTypes = [
@@ -89,6 +94,17 @@ class Model implements \JsonSerializable, \Serializable
         return Query::table(static::getTable());
     }
 
+    /**
+     * Serialize \DateTime objects, default format is ISO-8601.
+     * 
+     * @param \DateTimeInterface $date
+     * @param string $format
+     * @return string
+     */
+    public static function serializeDate(\DateTimeInterface $date, string $format = \DateTime::ATOM): string
+    {
+        return $date->format($format);
+    }
 
 
     /**
@@ -381,15 +397,19 @@ class Model implements \JsonSerializable, \Serializable
         $attributes = [];
         foreach ($this->attributes as $key => $value) {
             if (in_array($key, $this->getDateFields())) {
-                $value = $this->serializeDate($value);
+                $value = static::serializeDate($value);
             }
             $attributes[$key] = $value;
         }
         foreach ($this->dirty as $key => $value) {
             if (in_array($key, $this->getDateFields())) {
-                $value = $this->serializeDate($value);
+                $value = static::serializeDate($value);
             }
             $attributes[$key] = $value;
+        }
+
+        foreach ($this->sensitive as $key) {
+            unset($attributes[$key]);
         }
 
         return $attributes;
@@ -463,10 +483,10 @@ class Model implements \JsonSerializable, \Serializable
 
         foreach ($this->getDateFields() as $dateField) {
             if (isset($attributes[$dateField]) && $attributes[$dateField] instanceof \DateTime) {
-                $attributes[$dateField] = $this->serializeDate($attributes[$dateField]);
+                $attributes[$dateField] = static::serializeDate($attributes[$dateField]);
             }
             if (isset($dirty[$dateField]) && $dirty[$dateField] instanceof \DateTime) {
-                $dirty[$dateField] = $this->serializeDate($dirty[$dateField]);
+                $dirty[$dateField] = static::serializeDate($dirty[$dateField]);
             }
         }
 
@@ -579,17 +599,6 @@ class Model implements \JsonSerializable, \Serializable
     protected function isCastable(string $field): bool
     {
         return isset(static::$casts[$field]) || in_array($field, $this->getDateFields(), true);
-    }
-    
-    /**
-     * Serialize \DateTime objects
-     * 
-     * @param \DateTimeInterface $date
-     * @return string
-     */
-    protected function serializeDate(\DateTimeInterface $date): string
-    {
-        return $date->format('Y-m-d\TH:i:sP');
     }
 
     /**

@@ -3,6 +3,8 @@
 @section('content')
 
 <article class="has-text-centered">
+    @include('components.notifications')
+
     <div class="columns">
         <div class="column"></div>
         <div class="column">
@@ -11,9 +13,8 @@
                     <p class="heading">API Server</p>
                     <p class="title">Administration Login</p>
                 </div>
-                <form class="box" method="post">
-                    @include('components.notifications')
-                    <input type="hidden" name="csrf" value="{{ Session()->get('csrf') }}" />
+                <form class="box has-text-left" method="post">
+                    @csrf
                     <div class="field">
                         <label class="label">Email</label>
                         <div class="control">

@@ -15,17 +15,15 @@ require CONFIG_PATH . '/routes.php';
 $http = new React\Http\HttpServer(
     ...Application::singleton()->handleRequest()
 );
-// $http = new React\Http\HttpServer(
-//     new Ajthenewguy\Php8ApiServer\Http\Controllers\HomeController(),
-// );
 
 $socket = new React\Socket\SocketServer($_ENV['SERVER_HOST'] . ':' . $_ENV['SERVER_PORT']);
 
 $http->on('error', function (Throwable $e) {
-    Log::error($e->getMessage());
-    Log::error($e->getFile() . ':' . $e->getLine());
+    echo $e;
 });
+
 $http->listen($socket);
+
 
 Loop::addTimer(0.75, function () {
     Log::info('[ok] Listening on ' . $_ENV['SERVER_HOST'] . ':' . $_ENV['SERVER_PORT']);

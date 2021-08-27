@@ -38,10 +38,7 @@ class RecoverController extends Controller
         ])->then(function ($validated) use ($request) {
             [$data, $errors] = $validated;
             if ($errors) {
-                // return Response::make(join(', ', $errors), 422);
-                // header(sprintf("Location: %s/account/recover", $_ENV['APP_URL']), true, 302);
-                // die();
-                return Response::redirect('/account/recover');
+                return $request->redirectBackWithErrors($errors);
             }
 
             return PasswordResetToken::where('token', $data['token'])->first()->then(function ($Token) use ($request, $data) {

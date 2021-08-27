@@ -2,6 +2,8 @@
 
 namespace Ajthenewguy\Php8ApiServer\Routing;
 
+use Ajthenewguy\Php8ApiServer\Http\Request;
+use Ajthenewguy\Php8ApiServer\Services\AuthService;
 use Ajthenewguy\Php8ApiServer\Validation\Validator;
 use React\Promise;
 use React\Promise\PromiseInterface;
@@ -12,7 +14,20 @@ class Guard
         private array $requiredClaims = []
     ) {}
 
-    public function validate(?\stdClass $claims): PromiseInterface
+    public function validate(Request $request): PromiseInterface
+    {
+        if ($request->expectsJson()) {
+            return $this->validateClaims(AuthService::getClaims($request));
+        }
+        
+        return $request->user()->then(function ($User) {
+            return true;
+        }, function (\Exception $e) {
+            return false;
+        });
+    }
+
+    private function validateClaims(?\stdClass $claims): PromiseInterface
     {
         if ($claims) {
             // validate public claims

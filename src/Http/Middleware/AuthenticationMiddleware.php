@@ -1,19 +1,14 @@
-<?php
-
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 namespace Ajthenewguy\Php8ApiServer\Http\Middleware;
 
-use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\ServerError;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
 use Ajthenewguy\Php8ApiServer\Http\Request;
+use Ajthenewguy\Php8ApiServer\Http\Response;
 use Ajthenewguy\Php8ApiServer\Routing\Route;
-use Ajthenewguy\Php8ApiServer\Services\AuthService;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\SignatureInvalidException;
-use Psr\Http\Message\ServerRequestInterface;
-use WyriHaximus\React\Http\Middleware\SessionMiddleware;
 
 class AuthenticationMiddleware extends Middleware
 {
@@ -22,9 +17,8 @@ class AuthenticationMiddleware extends Middleware
         try {
             $requestMethod = $request->getMethod();
             $requestTarget = $request->getRequestTarget();
-            $contentType = $request->contentType();
 
-            if ($contentType !== 'application/json' && $contentType !== 'application/vnd.api+json') {
+            if (!$request->expectsJson()) {
                 $request->session()->begin();
             }
 
@@ -32,10 +26,15 @@ class AuthenticationMiddleware extends Middleware
                 
                 // Check for a Route Guard
                 if ($Guard = $Route->getGuard()) {
-
-                    return $Guard->validate(AuthService::getClaims($request))->then(function ($result) use ($request, $next, $Route) {
+                    return $Guard->validate($request)->then(function ($result) use ($request, $next, $Route, $requestTarget) {
                         if ($result === false) {
-                            return JsonResponse::make('Unauthorized', 401);
+                            if ($request->expectsJson()) {
+                                return JsonResponse::make('Unauthorized', 401);
+                            }
+
+                            $request->Session()->set('intended', $requestTarget);
+
+                            return Response::redirect('/login');
                         }
 
                         $request = $request->withAttribute('Route', $Route);
@@ -51,6 +50,11 @@ class AuthenticationMiddleware extends Middleware
                         return $next($request);
                     });
                 }
+            } else {
+                if ($request->expectsJson()) {
+                    return JsonResponse::make('Not Found', 404);
+                }
+                return Response::make('404 Not Found', 404);
             }
         } catch (ServerError $e) {
             return JsonResponse::make($e->getMessage(), $e->getCode());

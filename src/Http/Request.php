@@ -2,9 +2,11 @@
 
 namespace Ajthenewguy\Php8ApiServer\Http;
 
+use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Repositories\UserRepository;
 use Ajthenewguy\Php8ApiServer\Services\AuthService;
 use Ajthenewguy\Php8ApiServer\Session;
+use Ajthenewguy\Php8ApiServer\Str;
 use Ajthenewguy\Php8ApiServer\Traits\MagicProxy;
 use Ajthenewguy\Php8ApiServer\Validation\Validator;
 use Psr\Http\Message\ServerRequestInterface;
@@ -20,6 +22,18 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
 
     private array $POST;
 
+    private $attributes = array();
+
+    private $serverParams;
+
+    private $fileParams = array();
+
+    private $cookies = array();
+
+    private $queryParams = array();
+
+    private $parsedBody;
+
     private ServerRequestInterface $request;
 
     public function __construct(ServerRequestInterface $request)
@@ -27,12 +41,16 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
         $this->request = $this->proxied = $request;
         static::$proxiedClass = get_debug_type($request);
 
-        $current = $request->getRequestTarget();
+        if (!$this->isFile()) {
+            if (isset($this->attributes[SessionMiddleware::ATTRIBUTE_NAME])) {
+                $current = $request->getRequestTarget();
 
-        if ($current !== $this->getSession('current')) {
-            $this->putSession('previous', $this->getSession('current'));
+                if ($current !== $this->Session()->get('current')) {
+                    $this->Session()->set('previous', $this->Session()->get('current'));
+                }
+                $this->Session()->set('current', $current);
+            }
         }
-        $this->putSession('current', $current);
     }
 
     public static function redirect(string $location, int $statusCode = 302)
@@ -48,6 +66,11 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
     public function contentType(): string
     {
         return $this->request->getHeader('Content-Type')[0] ?? '';
+    }
+
+    public function expectsJson(): bool
+    {
+        return Str::contains($this->contentType(), 'json');
     }
 
     public function files()
@@ -68,27 +91,17 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
         return $this->GET;
     }
 
-    public function getSession(string $key, mixed $default = null)
-    {
-        if ($session = $this->session()) {
-            $contents = $session->getContents();
-        
-            return $contents[$key] ?? $default;
-        }
-        return $default;
-    }
-
     public function httpRequest(): ServerRequestInterface
     {
         return $this->request;
     }
 
-    public function input(?string $key = null): mixed
+    public function input(?string $key = null, mixed $default = null): mixed
     {
         $input = array_merge($this->get(), $this->post());
 
         if ($key) {
-            return $input[$key];
+            return $input[$key] ?? $default;
         }
 
         return $input;
@@ -99,6 +112,20 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
         $uriPath = '/' . ltrim($uriPath, '/');
 
         return $this->getUri()->getPath() === strtolower($uriPath);
+    }
+
+    public function isFile()
+    {
+        $rootPath = Application::singleton()->config()->get('static-files.path') ?? 'public';
+        $filePath = $this->getUri()->getPath();
+
+        if (!Str::startsWith($rootPath, DIRECTORY_SEPARATOR)) {
+            $rootPath = ROOT_PATH . DIRECTORY_SEPARATOR . $rootPath;
+        }
+
+        $file = $rootPath . $filePath;
+
+        return file_exists($file);
     }
 
     public function post(?string $key = null): mixed
@@ -159,8 +186,12 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
     public function redirectBack($statusCode = 302)
     {
         $location = '/';
-        if ($previous = $this->getSession('current')) {
+        if ($previous = $this->Session()->get('current')) {
             $location = $previous;
+        }
+
+        if ($statusCode > 399) {
+            $statusCode = 302;
         }
 
         return Response::redirect($location, $statusCode);
@@ -168,9 +199,17 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
 
     public function redirectBackWithErrors(array $errors, $statusCode = 302)
     {
-        $this->putSession('errors', $errors);
+        $this->Session()->flash('errors', $errors);
 
         return $this->redirectBack($statusCode);
+    }
+
+    public function redirectToIntended(string $default = '/')
+    {
+        if ($intended = $this->Session()->pull('intended')) {
+            return $this->redirect($intended);
+        }
+        return $this->redirect($default);
     }
 
     public function Session()
@@ -227,7 +266,9 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
 
     public function withCookieParams(array $cookies)
     {
-        return $this->request->withCookieParams($cookies);
+        $new = clone $this;
+        $new->cookies = $cookies;
+        return $new;
     }
 
     public function getQueryParams()
@@ -247,7 +288,9 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
 
     public function withUploadedFiles(array $uploadedFiles)
     {
-        return $this->request->withUploadedFiles($uploadedFiles);
+        $new = clone $this;
+        $new->fileParams = $uploadedFiles;
+        return $new;
     }
 
     public function getParsedBody()
@@ -257,7 +300,9 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
 
     public function withParsedBody($data)
     {
-        return $this->request->withParsedBody($data);
+        $new = clone $this;
+        $new->parsedBody = $data;
+        return $new;
     }
 
     public function getAttributes()
@@ -272,12 +317,15 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
 
     public function withAttribute($name, $value)
     {
-        return $this->request->withAttribute($name, $value);
+        $this->attributes[$name] = $value;
+        return $this;
     }
 
     public function withoutAttribute($name)
     {
-        return $this->request->withoutAttribute($name);
+        $new = clone $this;
+        unset($new->attributes[$name]);
+        return $new;
     }
 
     public function getRequestTarget()
@@ -312,7 +360,8 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
 
     public function withHeader($header, $value)
     {
-        return $this->request->withHeader($header, $value);
+        $newInstance = new static($this->request->withHeader($header, $value));
+        return $newInstance;
     }
 
 
@@ -328,7 +377,7 @@ class Request extends \RingCentral\Psr7\MessageTrait implements ServerRequestInt
         if ($name === 'ip') {
             return static::remoteAddress();
         } elseif ($name === 'user') {
-            if ($this->contentType() === 'application/json') {
+            if ($this->expectsJson()) {
                 return $this->authenticatedApiUser();
             } else {
                 return $this->authenticatedSessionUser();

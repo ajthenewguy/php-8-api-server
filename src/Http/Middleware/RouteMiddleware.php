@@ -6,16 +6,15 @@ use Ajthenewguy\Php8ApiServer\Application;
 use Ajthenewguy\Php8ApiServer\Exceptions\Http\ServerError;
 use Ajthenewguy\Php8ApiServer\Facades\Log;
 use Ajthenewguy\Php8ApiServer\Http\JsonResponse;
+use Ajthenewguy\Php8ApiServer\Http\Request;
 use Ajthenewguy\Php8ApiServer\Routing\Route;
 use Ajthenewguy\Php8ApiServer\Routing\RouteParameter;
-use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
-use React\Promise\Promise;
 
 class RouteMiddleware extends Middleware
 {
-    public function __invoke(ServerRequestInterface $request)
+    public function __invoke(Request $request)
     {
         try {
             $requestMethod = $request->getMethod();
@@ -49,9 +48,11 @@ class RouteMiddleware extends Middleware
                 }
             } catch (\Exception|\Throwable $e) {
                 Log::error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
+
+                return JsonResponse::make($e->getMessage(), $e->getCode());
             }
         } catch (ServerError $e) {
-            return JsonResponse::make($e->getMessage() . ' - RouteMiddleware', $e->getCode());
+            return JsonResponse::make($e->getMessage(), $e->getCode());
         }
 
         return JsonResponse::make('Internal Server Error', 500);
